@@ -154,32 +154,62 @@ def advanced_outlier_detection(df, column):
     
     return methods
 
-# Tool Implementation
-
 def generate_chart(df, config, title):
     """Generate chart based on configuration"""
     try:
         if config['type'] == 'Bar':
-            fig = px.bar(df, x=config['x'], y=config['y'], color=config.get('color'), title=title)
+            # Ensure x and y are serializable
+            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.bar(df, x=x, y=y, color=color_data, title=title)
         elif config['type'] == 'Line':
-            fig = px.line(df, x=config['x'], y=config['y'], color=config.get('color'), title=title)
+            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.line(df, x=x, y=y, color=color_data, title=title)
         elif config['type'] == 'Scatter':
-            fig = px.scatter(df, x=config['x'], y=config['y'], color=config.get('color'), title=title)
+            x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
         elif config['type'] == 'Histogram':
-            fig = px.histogram(df, x=config['column'], title=title)
+            col = df[config['column']]
+            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+                col = col.astype(float)
+            else:
+                col = col.astype(str)
+            fig = px.histogram(df, x=col, title=title)
         elif config['type'] == 'Box':
-            fig = px.box(df, y=config['column'], title=title)
+            col = df[config['column']]
+            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+                col = col.astype(float)
+            else:
+                col = col.astype(str)
+            fig = px.box(df, y=col, title=title)
         elif config['type'] == 'Pie':
             value_counts = df[config['column']].value_counts().head(10)
-            fig = px.pie(values=value_counts.values, names=value_counts.index, title=title)
+            fig = px.pie(values=value_counts.values.astype(float), names=value_counts.index.astype(str), title=title)
         elif config['type'] == 'Heatmap':
             if config['columns']:
                 corr_matrix = df[config['columns']].corr()
-                fig = px.imshow(corr_matrix, title=title)
+                fig = px.imshow(corr_matrix.astype(float), title=title)
             else:
                 st.warning("No numeric columns available for heatmap")
                 return
-        
+
         st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Error generating chart: {str(e)}")
@@ -923,7 +953,8 @@ elif selected_tool == "💼 Power BI Dashboard":
                 # Chart 1: Distribution of first numeric column
                 if len(numeric_cols) > 0 and charts_created < 6:
                     with chart_row1[0]:
-                        fig = px.histogram(df, x=numeric_cols[0], title=f"Distribution of {numeric_cols[0]}")
+                        col_data = df[numeric_cols[0]].astype(float)
+                        fig = px.histogram(df, x=col_data, title=f"Distribution of {numeric_cols[0]}")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
                 
@@ -931,7 +962,7 @@ elif selected_tool == "💼 Power BI Dashboard":
                 if len(categorical_cols) > 0 and charts_created < 6:
                     with chart_row1[1]:
                         top_categories = df[categorical_cols[0]].value_counts().head(10)
-                        fig = px.bar(x=top_categories.index, y=top_categories.values, 
+                        fig = px.bar(x=top_categories.index.astype(str), y=top_categories.values.astype(float), 
                                    title=f"Top Categories in {categorical_cols[0]}")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
@@ -940,14 +971,15 @@ elif selected_tool == "💼 Power BI Dashboard":
                 if len(numeric_cols) > 1 and charts_created < 6:
                     with chart_row2[0]:
                         corr_matrix = df[numeric_cols].corr()
-                        fig = px.imshow(corr_matrix, title="Correlation Matrix")
+                        fig = px.imshow(corr_matrix.astype(float), title="Correlation Matrix")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
                 
                 # Chart 4: Box plot of numeric columns
                 if len(numeric_cols) > 0 and charts_created < 6:
                     with chart_row2[1]:
-                        fig = px.box(df, y=numeric_cols[0], title=f"Outliers in {numeric_cols[0]}")
+                        col_data = df[numeric_cols[0]].astype(float)
+                        fig = px.box(df, y=col_data, title=f"Outliers in {numeric_cols[0]}")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
                 
@@ -955,8 +987,11 @@ elif selected_tool == "💼 Power BI Dashboard":
                 if len(numeric_cols) >= 2 and charts_created < 6:
                     with chart_row3[0]:
                         color_col = categorical_cols[0] if len(categorical_cols) > 0 else None
-                        fig = px.scatter(df, x=numeric_cols[0], y=numeric_cols[1], 
-                                       color=color_col, title=f"{numeric_cols[0]} vs {numeric_cols[1]}")
+                        x_data = df[numeric_cols[0]].astype(float)
+                        y_data = df[numeric_cols[1]].astype(float)
+                        color_data = df[color_col].astype(str) if color_col else None
+                        fig = px.scatter(df, x=x_data, y=y_data, 
+                                       color=color_data, title=f"{numeric_cols[0]} vs {numeric_cols[1]}")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
                 
@@ -964,7 +999,8 @@ elif selected_tool == "💼 Power BI Dashboard":
                 date_cols = df.select_dtypes(include=['datetime64']).columns
                 if len(date_cols) > 0 and len(numeric_cols) > 0 and charts_created < 6:
                     with chart_row3[1]:
-                        fig = px.line(df, x=date_cols[0], y=numeric_cols[0], 
+                        y_data = df[numeric_cols[0]].astype(float)
+                        fig = px.line(df, x=date_cols[0], y=y_data, 
                                     title=f"Time Series: {numeric_cols[0]}")
                         st.plotly_chart(fig, use_container_width=True)
                         charts_created += 1
@@ -973,7 +1009,7 @@ elif selected_tool == "💼 Power BI Dashboard":
                         # Missing values chart
                         missing_data = df.isnull().sum()
                         if missing_data.sum() > 0:
-                            fig = px.bar(x=missing_data.index, y=missing_data.values,
+                            fig = px.bar(x=missing_data.index.astype(str), y=missing_data.values.astype(float),
                                        title="Missing Values by Column")
                             st.plotly_chart(fig, use_container_width=True)
         
@@ -1319,7 +1355,7 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
             with col1:
                 st.dataframe(value_counts)
             with col2:
-                fig = px.bar(x=value_counts.index, y=value_counts.values, 
+                fig = px.bar(x=value_counts.index.astype(str), y=value_counts.values.astype(float), 
                            title=f"Top {n_top} Values in {col}")
                 st.plotly_chart(fig, use_container_width=True)
         

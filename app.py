@@ -186,6 +186,46 @@ def generate_chart(df, config, title):
 
 # Tool Implementation
 
+def execute_python_code(code, df):
+    """Execute Python code safely"""
+    try:
+        # Create a safe execution environment
+        exec_globals = {
+            'df': df,
+            'pd': pd,
+            'np': np,
+            'plt': plt,
+            'px': px,
+            'go': go,
+            'stats': stats,
+            'StandardScaler': StandardScaler,
+            'PCA': PCA,
+            'KMeans': KMeans,
+            'IsolationForest': IsolationForest,
+            'LabelEncoder': LabelEncoder
+        }
+        
+        # Capture output
+        from io import StringIO
+        import sys
+        
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = StringIO()
+        
+        # Execute code
+        exec(code, exec_globals)
+        
+        # Get output
+        sys.stdout = old_stdout
+        output = captured_output.getvalue()
+        
+        st.session_state.python_output = output
+        
+    except Exception as e:
+        st.error(f"Execution Error: {str(e)}")
+        st.session_state.python_output = f"Error: {str(e)}"
+# Tool Implementation
+
 if selected_tool == "📤 Data Upload":
     st.markdown('<h2 class="tool-header">📤 Data Upload & Preview</h2>', unsafe_allow_html=True)
     
@@ -1126,45 +1166,6 @@ print(df_clean.info())"""
                     if st.button(f"Reuse Code {len(st.session_state.python_history) - i}", key=f"reuse_{i}"):
                         st.session_state.python_code = entry['code']
                         st.experimental_rerun()
-
-def execute_python_code(code, df):
-    """Execute Python code safely"""
-    try:
-        # Create a safe execution environment
-        exec_globals = {
-            'df': df,
-            'pd': pd,
-            'np': np,
-            'plt': plt,
-            'px': px,
-            'go': go,
-            'stats': stats,
-            'StandardScaler': StandardScaler,
-            'PCA': PCA,
-            'KMeans': KMeans,
-            'IsolationForest': IsolationForest,
-            'LabelEncoder': LabelEncoder
-        }
-        
-        # Capture output
-        from io import StringIO
-        import sys
-        
-        old_stdout = sys.stdout
-        sys.stdout = captured_output = StringIO()
-        
-        # Execute code
-        exec(code, exec_globals)
-        
-        # Get output
-        sys.stdout = old_stdout
-        output = captured_output.getvalue()
-        
-        st.session_state.python_output = output
-        
-    except Exception as e:
-        st.error(f"Execution Error: {str(e)}")
-        st.session_state.python_output = f"Error: {str(e)}"
 
 elif selected_tool == "🐼 Pandas Query Tool":
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

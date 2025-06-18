@@ -1545,4 +1545,7 @@ def scrape_website(url, method, params, export_format):
                         json_data = df_results.to_json(orient='records')
                         st.download_button(
                             "💾 Download JSON",
-                            json_data
+                            data=json_data,
+                            file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json"
+                        )

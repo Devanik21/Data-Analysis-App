@@ -273,7 +273,39 @@ if selected_tool == "📤 Data Upload":
 
 elif selected_tool == "🔍 SQL Query Engine":
     st.markdown('<h2 class="tool-header">🔍 Advanced SQL Query Engine</h2>', unsafe_allow_html=True)
-    
+
+    # --- SQL Query Examples ---
+    with st.expander("🧠 SQL Query Examples", expanded=False):
+        st.markdown("""
+**1. Select everything**
+```sql
+SELECT * FROM data;
+```
+**2. Filter: Male users in Tokyo**
+```sql
+SELECT * FROM data
+WHERE gender = 'Male' AND city = 'Tokyo';
+```
+**3. Total purchases per city**
+```sql
+SELECT city, SUM(purchases) AS total_purchases
+FROM data
+GROUP BY city;
+```
+**4. Average income by gender**
+```sql
+SELECT gender, AVG(income) AS avg_income
+FROM data
+GROUP BY gender;
+```
+**5. Count users with missing age**
+```sql
+SELECT COUNT(*) AS missing_ages
+FROM data
+WHERE age IS NULL;
+```
+        """)
+
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
@@ -623,7 +655,36 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
 
 elif selected_tool == "📈 Excel Query Tool":
     st.markdown('<h2 class="tool-header">📈 Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
-    
+
+    # --- Excel Query Examples ---
+    with st.expander("📊 Excel Query Examples", expanded=False):
+        st.markdown("""
+**1. VLOOKUP Example:**  
+Find the email of user with ID 123  
+- Lookup Column: `user_id`  
+- Lookup Value: `123`  
+- Return Column: `email`
+
+**2. PIVOT Example:**  
+Summarize total sales by region and product  
+- Index: `region`  
+- Columns: `product`  
+- Values: `sales`  
+- Aggregation: `sum`
+
+**3. FILTER Example:**  
+Show all rows where `status` contains "Active"
+
+**4. SORT Example:**  
+Sort by `created_at` in descending order
+
+**5. SUMIF Example:**  
+Sum `amount` where `category` contains "Food"
+
+**6. SPLIT Example:**  
+Split `full_name` by space into `first_name` and `last_name`
+        """)
+
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
@@ -1169,7 +1230,37 @@ print(df_clean.info())"""
 
 elif selected_tool == "🐼 Pandas Query Tool":
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)
-    
+
+    # --- Pandas Query Examples ---
+    with st.expander("🐼 Pandas Query Examples", expanded=False):
+        st.markdown("""
+**1. Load the data**
+```python
+import pandas as pd
+df = pd.read_csv("your_file.csv")
+```
+**2. Show first 5 rows**
+```python
+df.head()
+```
+**3. Filter: Only Male users in Tokyo**
+```python
+df[(df['gender'] == 'Male') & (df['city'] == 'Tokyo')]
+```
+**4. Count how many purchases per city**
+```python
+df.groupby('city')['purchases'].sum()
+```
+**5. Average income per gender**
+```python
+df.groupby('gender')['income'].mean()
+```
+**6. Fill missing ages with average**
+```python
+df['age'] = df['age'].fillna(df['age'].mean())
+```
+        """)
+
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:

@@ -178,7 +178,7 @@ def generate_chart(df, config, title):
             fig = px.line(df, x=x, y=y, color=color_data, title=title)
         elif config['type'] == 'Scatter':
             x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
-            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            y = df[config['y']].astype(float) if not pd.api_types.is_numeric_dtype(df[config['y']]) else df[config['y']]
             color = config.get('color')
             if color:
                 color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
@@ -456,7 +456,12 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 
                 st.subheader("🏷️ Data Types")
                 dtype_counts = df.dtypes.value_counts()
-                fig = px.pie(values=dtype_counts.values, names=dtype_counts.index, title="Data Type Distribution")
+                # Convert dtype index to strings and values to float for serialization
+                fig = px.pie(
+                    values=dtype_counts.values.astype(float),
+                    names=[str(x) for x in dtype_counts.index],
+                    title="Data Type Distribution"
+                )
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:

@@ -1275,7 +1275,7 @@ elif selected_tool == "🐼 Pandas Query Tool":
     # --- Pandas Query Examples ---
     with st.expander("🐼 Pandas Query Examples", expanded=False):
         st.markdown("""
-**1. Load the data**
+**1. Load the data (Illustrative - data is already loaded as `df` in the app)**
 ```python
 import pandas as pd
 df = pd.read_csv("your_file.csv")

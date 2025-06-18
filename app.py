@@ -1549,3 +1549,5 @@ def scrape_website(url, method, params, export_format):
                             file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                             mime="application/json"
                         )
+    except Exception as e:
+        st.error(f"Web scraping error: {str(e)}")

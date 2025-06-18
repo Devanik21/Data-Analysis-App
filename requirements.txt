@@ -1,10 +1,19 @@
-streamlit>=1.22.0
-pandas>=1.5.0
-numpy>=1.23.0
-matplotlib>=3.6.0
-seaborn>=0.12.0
-plotly>=5.10.0
-openpyxl>=3.1.0
-xlrd>=2.0.1
-requests>=2.28.0
-beautifulsoup4>=4.12.0
+streamlit
+pandas
+numpy
+plotly
+seaborn
+matplotlib
+scipy
+scikit-learn
+openpyxl
+sqlalchemy
+requests
+beautifulsoup4
+# For reading parquet files (optional, but used in code)
+pyarrow
+# For Excel file support (already included via openpyxl, but xlsx support)
+xlrd
+# For database support (sqlite3 is built-in, but SQLAlchemy is used)
+# For JSON and time handling (built-in: json, datetime, time)
+# For warnings and re (built

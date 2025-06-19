@@ -1175,12 +1175,10 @@ elif selected_tool == "💼 Power BI Dashboard":
     else:
         df = st.session_state.df
         
-        dashboard_type = st.radio("Dashboard Type", ["📊 Automatic Dashboard", "🎯 Manual Dashboard"])
+        st.subheader("🤖 Auto-Generated Dashboard")
         
-        if dashboard_type == "📊 Automatic Dashboard":
-            st.subheader("🤖 Auto-Generated Dashboard")
-            
-            with st.spinner("Generating dashboard..."):
+        with st.spinner("Generating dashboard... This may take a moment for larger datasets or more plots."):
+            try:
                 # Dashboard metrics
                 col1, col2, col3, col4 = st.columns(4)
                 
@@ -1198,189 +1196,125 @@ elif selected_tool == "💼 Power BI Dashboard":
                         st.metric("Avg of First Numeric", f"{df[numeric_cols[0]].mean():.2f}")
                 
                 # Auto-generated charts
-                chart_row1 = st.columns(2)
-                chart_row2 = st.columns(2)
-                chart_row3 = st.columns(2)
+                # We'll aim for a more dynamic layout, potentially up to 3x3 grid
                 
-                charts_created = 0
-                
-                # Chart 1: Distribution of first numeric column
-                if len(numeric_cols) > 0 and charts_created < 6:
-                    with chart_row1[0]:
-                        col_data = df[numeric_cols[0]].astype(float)
-                        fig = px.histogram(df, x=col_data, title=f"Distribution of {numeric_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                
-                # Chart 2: Top categories in first categorical column
-                if len(categorical_cols) > 0 and charts_created < 6:
-                    with chart_row1[1]:
-                        top_categories = df[categorical_cols[0]].value_counts().head(10)
-                        fig = px.bar(x=top_categories.index.astype(str), y=top_categories.values.astype(float), 
-                                   title=f"Top Categories in {categorical_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                
-                # Chart 3: Correlation heatmap (if multiple numeric columns)
-                if len(numeric_cols) > 1 and charts_created < 6:
-                    with chart_row2[0]:
-                        corr_matrix = df[numeric_cols].corr()
-                        fig = px.imshow(corr_matrix.astype(float), title="Correlation Matrix")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                
-                # Chart 4: Box plot of numeric columns
-                if len(numeric_cols) > 0 and charts_created < 6:
-                    with chart_row2[1]:
-                        col_data = df[numeric_cols[0]].astype(float)
-                        fig = px.box(df, y=col_data, title=f"Outliers in {numeric_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                
-                # Chart 5: Scatter plot (if 2+ numeric columns)
-                if len(numeric_cols) >= 2 and charts_created < 6:
-                    with chart_row3[0]:
-                        color_col = categorical_cols[0] if len(categorical_cols) > 0 else None
-                        x_data = df[numeric_cols[0]].astype(float)
-                        y_data = df[numeric_cols[1]].astype(float)
-                        color_data = df[color_col].astype(str) if color_col else None
-                        fig = px.scatter(df, x=x_data, y=y_data, 
-                                       color=color_data, title=f"{numeric_cols[0]} vs {numeric_cols[1]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                
-                # Chart 6: Time series (if date column exists)
+                plot_configs = []
+
+                # Plot 1: Distribution of first numeric column (Histogram)
+                if len(numeric_cols) > 0:
+                    plot_configs.append({'type': 'Histogram', 'column': numeric_cols[0], 'title': f"Distribution of {numeric_cols[0]}"})
+
+                # Plot 2: Top categories in first categorical column (Bar chart)
+                if len(categorical_cols) > 0:
+                    plot_configs.append({'type': 'Bar_Categorical', 'column': categorical_cols[0], 'title': f"Top Categories in {categorical_cols[0]}"})
+
+                # Plot 3: Correlation heatmap (if multiple numeric columns)
+                if len(numeric_cols) > 1:
+                    plot_configs.append({'type': 'Heatmap_Correlation', 'columns': numeric_cols, 'title': "Correlation Matrix"})
+
+                # Plot 4: Box plot of a prominent numeric column
+                if len(numeric_cols) > 0:
+                    # Select a numeric column that's not just an ID (heuristic: high variance or many unique values)
+                    prominent_numeric = numeric_cols[0]
+                    if len(numeric_cols) > 1:
+                        variances = df[numeric_cols].var().sort_values(ascending=False)
+                        if not variances.empty:
+                            prominent_numeric = variances.index[0]
+                    plot_configs.append({'type': 'Box', 'column': prominent_numeric, 'title': f"Box Plot of {prominent_numeric}"})
+
+                # Plot 5: Scatter plot (if 2+ numeric columns)
+                if len(numeric_cols) >= 2:
+                    x_scatter, y_scatter = numeric_cols[0], numeric_cols[1]
+                    if len(numeric_cols) > 2 and df[numeric_cols[0]].nunique() < 10: # Prefer more continuous for x if possible
+                         x_scatter, y_scatter = numeric_cols[1], numeric_cols[2]
+                    
+                    color_scatter = categorical_cols[0] if len(categorical_cols) > 0 else None
+                    plot_configs.append({'type': 'Scatter', 'x': x_scatter, 'y': y_scatter, 'color': color_scatter, 'title': f"{x_scatter} vs {y_scatter}"})
+
+                # Plot 6: Time series (if date column exists and a numeric column)
                 date_cols = df.select_dtypes(include=['datetime64']).columns
-                if len(date_cols) > 0 and len(numeric_cols) > 0 and charts_created < 6:
-                    with chart_row3[1]:
-                        y_data = df[numeric_cols[0]].astype(float)
-                        fig = px.line(df, x=date_cols[0], y=y_data, 
-                                    title=f"Time Series: {numeric_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                        charts_created += 1
-                elif charts_created < 6:
-                    with chart_row3[1]:
-                        # Missing values chart
-                        missing_data = df.isnull().sum()
-                        if missing_data.sum() > 0:
-                            fig = px.bar(x=missing_data.index.astype(str), y=missing_data.values.astype(float),
-                                       title="Missing Values by Column")
-                            st.plotly_chart(fig, use_container_width=True)
-        
-        else:  # Manual Dashboard
-            st.subheader("🎯 Custom Dashboard Builder")
-            
-            # Dashboard layout selection
-            layout = st.selectbox("Select Layout", ["2x2 Grid", "3x2 Grid", "Single Row", "Single Column"])
-            
-            if layout == "2x2 Grid":
-                cols = st.columns(2)
-                rows = 2
-            elif layout == "3x2 Grid":
-                cols = st.columns(3)
-                rows = 2
-            elif layout == "Single Row":
-                cols = st.columns(4)
-                rows = 1
-            else:  # Single Column
-                cols = [st.container()]
-                rows = 4
-            
-            # Chart configuration
-            st.subheader("📊 Chart Configuration")
-            
-            chart_configs = []
-            num_charts = min(len(cols) * rows, 6)
-            
-            for i in range(num_charts):
-                with st.expander(f"Chart {i+1} Configuration"):
-                    chart_type_manual = st.selectbox(f"Chart Type {i+1}", 
-                                            ["Bar", "Line", "Scatter", "Histogram", "Box", "Pie", "Heatmap"],
-                                            key=f"chart_type_{i}")
-                    
-                    numeric_cols_manual = df.select_dtypes(include=np.number).columns.tolist()
-                    all_cols_manual = df.columns.tolist()
-
-                    if chart_type_manual in ["Bar", "Line"]:
-                        x_col_manual = st.selectbox(f"X-axis {i+1}", all_cols_manual, key=f"x_col_{i}")
-                        y_col_manual = st.selectbox(f"Y-axis {i+1}", numeric_cols_manual if numeric_cols_manual else all_cols_manual, key=f"y_col_{i}")
-                        color_col_manual = st.selectbox(f"Color by {i+1}", ['None'] + all_cols_manual, key=f"color_col_{i}")
-                        chart_configs.append({'type': chart_type_manual, 'x': x_col_manual, 'y': y_col_manual, 'color': None if color_col_manual == 'None' else color_col_manual})
-                    
-                    elif chart_type_manual == "Scatter":
-                        if not numeric_cols_manual or len(numeric_cols_manual) < 2 :
-                            st.warning(f"Scatter plot {i+1} requires at least two numeric columns.")
-                            continue 
-                        x_col_manual = st.selectbox(f"X-axis (Numeric) {i+1}", numeric_cols_manual, key=f"x_col_{i}")
-                        y_col_manual = st.selectbox(f"Y-axis (Numeric) {i+1}", numeric_cols_manual, key=f"y_col_{i}")
-                        color_col_manual = st.selectbox(f"Color by {i+1}", ['None'] + all_cols_manual, key=f"color_col_{i}")
-                        chart_configs.append({'type': chart_type_manual, 'x': x_col_manual, 'y': y_col_manual, 'color': None if color_col_manual == 'None' else color_col_manual})
-
-                    elif chart_type_manual in ["Histogram", "Box"]:
-                        col_options_hist_box = numeric_cols_manual if chart_type_manual == "Box" and numeric_cols_manual else all_cols_manual
-                        if not col_options_hist_box:
-                             st.warning(f"No suitable columns for {chart_type_manual} plot {i+1}.")
-                             continue
-                        col = st.selectbox(f"Column {i+1}", col_options_hist_box, key=f"col_{i}")
-                        chart_configs.append({
-                            'type': chart_type_manual,
-                            'column': col
-                        })
-                    
-                    elif chart_type == "Pie":
-                        col = st.selectbox(f"Category Column {i+1}", df.columns.tolist(), key=f"pie_col_{i}")
-                        chart_configs.append({
-                            'type': chart_type,
-                            'column': col
-                        }) # Typo: chart_type should be chart_type_manual
-                    
-                    elif chart_type == "Heatmap":
-                        if not numeric_cols_manual or len(numeric_cols_manual) < 2:
-                            st.warning(f"Heatmap {i+1} requires at least two numeric columns.")
-                            continue
-                        chart_configs.append({
-                            'type': chart_type_manual,
-                            'columns': numeric_cols_manual
-                        })
-            
-            if st.button("🚀 Generate Dashboard"):
-                # Generate charts based on configuration
-                chart_index = 0
-                if layout == "2x2 Grid":
-                    for row in range(2):
-                        cols = st.columns(2)
-                        for col_idx in range(2):
-                            if chart_index < len(chart_configs):
-                                config = chart_configs[chart_index]
-                                with cols[col_idx]:
-                                    generate_chart(df, config, f"Chart {chart_index + 1}")
-                                chart_index += 1
+                if len(date_cols) > 0 and len(numeric_cols) > 0:
+                    plot_configs.append({'type': 'Line_Time_Series', 'x': date_cols[0], 'y': numeric_cols[0], 'title': f"Time Series: {numeric_cols[0]} over {date_cols[0]}"})
                 
-                elif layout == "3x2 Grid":
-                    for row in range(2):
-                        cols = st.columns(3)
-                        for col_idx in range(3):
-                            if chart_index < len(chart_configs):
-                                config = chart_configs[chart_index]
-                                with cols[col_idx]:
-                                    generate_chart(df, config, f"Chart {chart_index + 1}")
-                                chart_index += 1
+                # Plot 7: Pie chart for a categorical column with few unique values
+                if len(categorical_cols) > 0:
+                    cat_for_pie = None
+                    for cat_col in categorical_cols:
+                        if 2 < df[cat_col].nunique() <= 10: # Good candidate for pie chart
+                            cat_for_pie = cat_col
+                            break
+                    if cat_for_pie:
+                         plot_configs.append({'type': 'Pie', 'column': cat_for_pie, 'title': f"Distribution of {cat_for_pie}"})
                 
-                elif layout == "Single Row":
-                    if chart_configs:
-                        cols = st.columns(len(chart_configs))
-                        for i, config in enumerate(chart_configs):
-                            with cols[i]:
-                                generate_chart(df, config, f"Chart {i + 1}")
-                    else:
-                        st.info("No charts configured.")
-                
-                else:  # Single Column
-                    for i, config in enumerate(chart_configs):
-                        # Use a container for single column layout
-                        with st.container():
-                            generate_chart(df, config, f"Chart {i + 1}")
+                # Plot 8: Bar chart of mean/sum of a numeric column grouped by a categorical
+                if len(numeric_cols) > 0 and len(categorical_cols) > 0:
+                    # Choose a categorical column with a reasonable number of unique values for grouping
+                    group_cat_col = None
+                    for cat_col in categorical_cols:
+                        if df[cat_col].nunique() <= 15: # Max 15 groups for readability
+                            group_cat_col = cat_col
+                            break
+                    if group_cat_col:
+                        plot_configs.append({'type': 'Bar_Grouped_Numeric', 'x_cat': group_cat_col, 'y_num': numeric_cols[0], 'agg': 'mean', 'title': f"Mean of {numeric_cols[0]} by {group_cat_col}"})
 
+                # Plot 9: Density plot for a numeric column (if different from first histogram)
+                if len(numeric_cols) > 1:
+                     plot_configs.append({'type': 'Density_Histogram', 'column': numeric_cols[1], 'title': f"Density of {numeric_cols[1]}"})
+                elif len(numeric_cols) == 1 and not any(p['type'] == 'Histogram' and p['column'] == numeric_cols[0] for p in plot_configs): # if only one numeric and no histogram yet
+                     plot_configs.append({'type': 'Density_Histogram', 'column': numeric_cols[0], 'title': f"Density of {numeric_cols[0]}"})
+
+
+                # Display plots in a grid
+                num_plots = len(plot_configs)
+                if num_plots == 0:
+                    st.info("Not enough diverse data types to generate a variety of plots automatically.")
+                
+                cols_per_row = 3 # Max 3 plots per row
+                
+                for i in range(0, num_plots, cols_per_row):
+                    row_plot_configs = plot_configs[i : i + cols_per_row]
+                    plot_cols = st.columns(len(row_plot_configs))
+                    for j, config in enumerate(row_plot_configs):
+                        with plot_cols[j]:
+                            if config['type'] == 'Histogram':
+                                fig = px.histogram(df, x=df[config['column']].astype(float), title=config['title'], marginal="box")
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Bar_Categorical':
+                                top_categories = df[config['column']].value_counts().nlargest(15) # Show top 15
+                                fig = px.bar(x=top_categories.index.astype(str), y=top_categories.values.astype(float), title=config['title'])
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Heatmap_Correlation':
+                                corr_matrix = df[config['columns']].corr()
+                                fig = px.imshow(corr_matrix.astype(float), title=config['title'], color_continuous_scale="RdBu_r", aspect="auto")
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Box':
+                                fig = px.box(df, y=df[config['column']].astype(float), title=config['title'])
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Scatter':
+                                x_data = df[config['x']].astype(float)
+                                y_data = df[config['y']].astype(float)
+                                color_data = df[config['color']].astype(str) if config['color'] else None
+                                fig = px.scatter(df, x=x_data, y=y_data, color=color_data, title=config['title'], marginal_x="histogram", marginal_y="histogram")
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Line_Time_Series':
+                                fig = px.line(df, x=config['x'], y=df[config['y']].astype(float), title=config['title'])
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Pie':
+                                value_counts_pie = df[config['column']].value_counts().nlargest(10) # Max 10 slices
+                                fig = px.pie(values=value_counts_pie.values.astype(float), names=value_counts_pie.index.astype(str), title=config['title'])
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Bar_Grouped_Numeric':
+                                grouped_data = df.groupby(config['x_cat'])[config['y_num']].agg(config['agg']).reset_index().nlargest(15, config['y_num']) # Top 15 groups
+                                fig = px.bar(grouped_data, x=config['x_cat'], y=config['y_num'], title=config['title'], color=config['y_num'])
+                                st.plotly_chart(fig, use_container_width=True)
+                            elif config['type'] == 'Density_Histogram': # Replaces Histogram for density
+                                fig = px.histogram(df, x=df[config['column']].astype(float), title=config['title'], marginal="rug", histnorm='probability density') # Added histnorm
+                                st.plotly_chart(fig, use_container_width=True)
+            
+            except Exception as e:
+                st.error(f"An error occurred while generating the automatic dashboard: {e}")
+                st.error("Please ensure your data is suitable for the selected visualizations or try uploading a different dataset.")
+                
 # Continue with Python Advanced Analytics
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics Engine</h2>', unsafe_allow_html=True)

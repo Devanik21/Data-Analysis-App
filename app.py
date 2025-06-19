@@ -355,7 +355,7 @@ if selected_tool == "📤 Data Upload":
                         df_cleaned.dropna(subset=[missing_col], inplace=True)
                         st.session_state.df = df_cleaned
                         st.success(f"Dropped rows with NaNs in '{missing_col}'. New shape: {df_cleaned.shape}")
-                    st.experimental_rerun()
+                    st.rerun()
 
             st.markdown("#### 🔄 Change Data Type")
             type_col = st.selectbox("Select column to change type", df.columns.tolist(), key="clean_type_col")
@@ -370,7 +370,7 @@ if selected_tool == "📤 Data Upload":
                             df_typed[type_col] = df_typed[type_col].astype(new_type)
                         st.session_state.df = df_typed
                         st.success(f"Converted '{type_col}' to {new_type}.")
-                        st.experimental_rerun()
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error converting type: {e}")
 
@@ -380,7 +380,7 @@ if selected_tool == "📤 Data Upload":
                 removed_count = len(df) - len(df_no_duplicates)
                 st.session_state.df = df_no_duplicates
                 st.success(f"Removed {removed_count} duplicate rows. New shape: {df_no_duplicates.shape}")
-                st.experimental_rerun()
+                st.rerun()
 
             st.markdown("#### ✏️ Rename Columns")
             col_to_rename = st.selectbox("Select column to rename", df.columns.tolist(), key="rename_col_select")
@@ -392,7 +392,7 @@ if selected_tool == "📤 Data Upload":
                         df_renamed.rename(columns={col_to_rename: new_col_name_rename}, inplace=True)
                         st.session_state.df = df_renamed
                         st.success(f"Column '{col_to_rename}' renamed to '{new_col_name_rename}'.")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.warning("Please enter a valid new column name different from the original.")
             
@@ -403,7 +403,7 @@ if selected_tool == "📤 Data Upload":
                     df_dropped = df.drop(columns=cols_to_drop)
                     st.session_state.df = df_dropped
                     st.success(f"Dropped columns: {', '.join(cols_to_drop)}. New shape: {df_dropped.shape}")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.warning("Please select at least one column to drop.")
 
@@ -1670,7 +1670,7 @@ print(df_clean.info())"""
                     st.caption(f"Executed: {entry['timestamp']}")
                     if st.button(f"Reuse Code {len(st.session_state.python_history) - i}", key=f"reuse_{i}"):
                         st.session_state.python_code = entry['code']
-                        st.experimental_rerun()
+                        st.rerun()
 
 elif selected_tool == "🐼 Pandas Query Tool":
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

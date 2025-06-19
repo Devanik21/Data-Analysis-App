@@ -705,7 +705,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         st.write(f"**Skewness:** {df[col].skew():.3f}")
                         st.write(f"**Kurtosis:** {df[col].kurtosis():.3f}")
                     elif pd.api.types.is_datetime64_any_dtype(df[col]):
-                        st.write(df[col].describe(datetime_is_numeric=True))
+                        st.write(df[col].describe())
                     else: # Categorical or Object
                         st.write(df[col].describe())
                         st.write(f"**Mode:** {df[col].mode().tolist()}")

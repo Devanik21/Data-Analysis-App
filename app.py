@@ -708,7 +708,12 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         st.write(df[col].describe())
                     else: # Categorical or Object
                         st.write(df[col].describe())
-                        st.write(f"**Mode:** {df[col].mode().tolist()}")
+                        modes = df[col].mode().tolist()
+                        if len(modes) > 10: # If more than 10 modes, truncate
+                            st.write(f"**Mode (Top 10):** {modes[:10]} ... (and {len(modes) - 10} more)")
+                        else:
+                            st.write(f"**Mode:** {modes}")
+
 
         elif selected_eda == "📋 Data Quality Report":
             st.subheader("📋 Data Quality Report")

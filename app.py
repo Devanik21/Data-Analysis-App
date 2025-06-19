@@ -280,9 +280,9 @@ if selected_tool == "📤 Data Upload":
                     st.dataframe(df.head(10))
                     
                     # Download processed data
-                    st.markdown(
+                    st.html( # Use st.html for modern Streamlit
                         create_download_link(df, f"processed_{uploaded_file.name}"),
-                        unsafe_allow_html=True
+                        # unsafe_allow_html=True # Not needed for st.html
                     )
     
     with col2:
@@ -295,11 +295,152 @@ if selected_tool == "📤 Data Upload":
             st.metric("🕒 Data Types", len(df.dtypes.unique()))
             st.markdown('</div>', unsafe_allow_html=True)
             
-            # Quick Stats
-            st.subheader("📊 Quick Statistics")
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            if len(numeric_cols) > 0:
-                st.dataframe(df[numeric_cols].describe())
+    if st.session_state.df is not None:
+        df = st.session_state.df # Ensure df is the one from session state
+        st.markdown("---")
+        st.subheader("🔬 Detailed Data Insights & Tools")
+
+        with st.expander("📊 Column-wise Summary", expanded=True):
+            summary_data = []
+            for col in df.columns:
+                col_data = {
+                    "Column": col,
+                    "Data Type": str(df[col].dtype),
+                    "Missing Values": df[col].isnull().sum(),
+                    "Missing (%)": f"{df[col].isnull().mean() * 100:.2f}%",
+                    "Unique Values": df[col].nunique()
+                }
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    col_data["Mean"] = f"{df[col].mean():.2f}"
+                    col_data["Median"] = f"{df[col].median():.2f}"
+                    col_data["Std Dev"] = f"{df[col].std():.2f}"
+                    col_data["Min"] = f"{df[col].min():.2f}"
+                    col_data["Max"] = f"{df[col].max():.2f}"
+                else: # For categorical, show top few unique values
+                    top_values = df[col].value_counts().nlargest(3).index.tolist()
+                    col_data["Top Values"] = ", ".join(map(str,top_values)) + ('...' if df[col].nunique() > 3 else '')
+                summary_data.append(col_data)
+            
+            summary_df = pd.DataFrame(summary_data).set_index("Column")
+            st.dataframe(summary_df)
+
+        with st.expander("🧹 Data Cleaning Utilities"):
+            st.markdown("#### 💧 Handle Missing Values")
+            missing_col = st.selectbox("Select column with missing values", 
+                                       [col for col in df.columns if df[col].isnull().any()], 
+                                       key="clean_missing_col")
+            if missing_col:
+                fill_method = st.selectbox("Method", ["None", "Fill with Mean (Numeric)", "Fill with Median (Numeric)", "Fill with Mode", "Drop Rows with NaN in this column"], key="clean_fill_method")
+                if st.button("Apply Missing Value Treatment", key="clean_apply_missing"):
+                    df_cleaned = df.copy()
+                    if fill_method == "Fill with Mean (Numeric)":
+                        if pd.api.types.is_numeric_dtype(df_cleaned[missing_col]):
+                            df_cleaned[missing_col].fillna(df_cleaned[missing_col].mean(), inplace=True)
+                            st.session_state.df = df_cleaned
+                            st.success(f"Filled NaNs in '{missing_col}' with mean.")
+                        else:
+                            st.error("Mean imputation only for numeric columns.")
+                    elif fill_method == "Fill with Median (Numeric)":
+                        if pd.api.types.is_numeric_dtype(df_cleaned[missing_col]):
+                            df_cleaned[missing_col].fillna(df_cleaned[missing_col].median(), inplace=True)
+                            st.session_state.df = df_cleaned
+                            st.success(f"Filled NaNs in '{missing_col}' with median.")
+                        else:
+                            st.error("Median imputation only for numeric columns.")
+                    elif fill_method == "Fill with Mode":
+                        df_cleaned[missing_col].fillna(df_cleaned[missing_col].mode()[0], inplace=True)
+                        st.session_state.df = df_cleaned
+                        st.success(f"Filled NaNs in '{missing_col}' with mode.")
+                    elif fill_method == "Drop Rows with NaN in this column":
+                        df_cleaned.dropna(subset=[missing_col], inplace=True)
+                        st.session_state.df = df_cleaned
+                        st.success(f"Dropped rows with NaNs in '{missing_col}'. New shape: {df_cleaned.shape}")
+                    st.experimental_rerun()
+
+            st.markdown("#### 🔄 Change Data Type")
+            type_col = st.selectbox("Select column to change type", df.columns.tolist(), key="clean_type_col")
+            if type_col:
+                new_type = st.selectbox("New Data Type", ["object (string)", "int64", "float64", "datetime64"], key="clean_new_type")
+                if st.button("Convert Data Type", key="clean_apply_type"):
+                    try:
+                        df_typed = df.copy()
+                        if new_type == "datetime64":
+                            df_typed[type_col] = pd.to_datetime(df_typed[type_col])
+                        else:
+                            df_typed[type_col] = df_typed[type_col].astype(new_type)
+                        st.session_state.df = df_typed
+                        st.success(f"Converted '{type_col}' to {new_type}.")
+                        st.experimental_rerun()
+                    except Exception as e:
+                        st.error(f"Error converting type: {e}")
+
+            st.markdown("#### 🗑️ Remove Duplicates")
+            if st.button("Remove All Duplicate Rows", key="clean_remove_duplicates"):
+                df_no_duplicates = df.drop_duplicates()
+                removed_count = len(df) - len(df_no_duplicates)
+                st.session_state.df = df_no_duplicates
+                st.success(f"Removed {removed_count} duplicate rows. New shape: {df_no_duplicates.shape}")
+                st.experimental_rerun()
+
+            st.markdown("#### ✏️ Rename Columns")
+            col_to_rename = st.selectbox("Select column to rename", df.columns.tolist(), key="rename_col_select")
+            if col_to_rename:
+                new_col_name_rename = st.text_input("Enter new name for the column:", value=col_to_rename, key="rename_col_new_name")
+                if st.button("Rename Column", key="rename_col_button"):
+                    if new_col_name_rename and new_col_name_rename != col_to_rename:
+                        df_renamed = df.copy()
+                        df_renamed.rename(columns={col_to_rename: new_col_name_rename}, inplace=True)
+                        st.session_state.df = df_renamed
+                        st.success(f"Column '{col_to_rename}' renamed to '{new_col_name_rename}'.")
+                        st.experimental_rerun()
+                    else:
+                        st.warning("Please enter a valid new column name different from the original.")
+            
+            st.markdown("#### ❌ Drop Columns")
+            cols_to_drop = st.multiselect("Select columns to drop", df.columns.tolist(), key="drop_cols_multiselect")
+            if st.button("Drop Selected Columns", key="drop_cols_button"):
+                if cols_to_drop:
+                    df_dropped = df.drop(columns=cols_to_drop)
+                    st.session_state.df = df_dropped
+                    st.success(f"Dropped columns: {', '.join(cols_to_drop)}. New shape: {df_dropped.shape}")
+                    st.experimental_rerun()
+                else:
+                    st.warning("Please select at least one column to drop.")
+
+        with st.expander("📊 Quick Visualizations"):
+            st.markdown("#### Missing Values Distribution")
+            missing_counts = df.isnull().sum()
+            missing_counts = missing_counts[missing_counts > 0]
+            if not missing_counts.empty:
+                fig_missing = px.bar(missing_counts, x=missing_counts.index, y=missing_counts.values,
+                                     labels={'x': 'Column', 'y': 'Number of Missing Values'},
+                                     title="Missing Values per Column")
+                st.plotly_chart(fig_missing, use_container_width=True)
+            else:
+                st.info("No missing values to visualize.")
+
+            st.markdown("#### Numeric Column Histogram")
+            numeric_cols_viz = df.select_dtypes(include=np.number).columns.tolist()
+            if numeric_cols_viz:
+                hist_col = st.selectbox("Select numeric column for histogram", numeric_cols_viz, key="viz_hist_col")
+                if hist_col:
+                    fig_hist = px.histogram(df, x=hist_col, title=f"Histogram of {hist_col}", marginal="box")
+                    st.plotly_chart(fig_hist, use_container_width=True)
+            else:
+                st.info("No numeric columns for histogram.")
+
+            st.markdown("#### Categorical Column Bar Chart")
+            cat_cols_viz = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            if cat_cols_viz:
+                bar_col = st.selectbox("Select categorical column for bar chart", cat_cols_viz, key="viz_bar_col")
+                if bar_col:
+                    top_n_cat = st.slider("Show Top N categories", 1, 20, min(10, df[bar_col].nunique()), key="viz_bar_top_n")
+                    val_counts = df[bar_col].value_counts().nlargest(top_n_cat)
+                    fig_bar = px.bar(val_counts, x=val_counts.index, y=val_counts.values,
+                                     labels={'x': bar_col, 'y': 'Count'}, title=f"Top {top_n_cat} Value Counts for {bar_col}")
+                    st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.info("No categorical columns for bar chart.")
 
 elif selected_tool == "🔍 SQL Query Engine":
     st.markdown('<h2 class="tool-header">🔍 Advanced SQL Query Engine</h2>', unsafe_allow_html=True)

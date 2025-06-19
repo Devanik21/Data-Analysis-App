@@ -1343,8 +1343,8 @@ df['age'] = df['age'].fillna(df['age'].mean())
         
         # Quick operations
         quick_ops = st.selectbox("Quick Operations", [
-            "Data Info", "Head/Tail", "Describe", "Value Counts", "Group By", 
-            "Merge/Join", "Pivot", "Melt", "Apply Function", "Query", "Custom"
+            "Data Info", "Head/Tail", "Describe", "Value Counts", "Group By (Enhanced)", 
+            "Merge/Join", "Pivot Table", "Window Functions", "Melt", "Apply Function", "Query", "Custom"
         ])
         
         if quick_ops == "Data Info":
@@ -1396,30 +1396,243 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
                            title=f"Top {n_top} Values in {col}")
                 st.plotly_chart(fig, use_container_width=True)
         
-        elif quick_ops == "Group By":
-            group_col = st.selectbox("Group By Column", df.columns.tolist())
-            agg_col = st.selectbox("Aggregate Column", df.select_dtypes(include=[np.number]).columns.tolist())
-            agg_func = st.selectbox("Aggregation Function", ["sum", "mean", "count", "min", "max", "std"])
-            
-            if st.button("Execute Group By"):
-                try:
-                    result = df.groupby(group_col)[agg_col].agg(agg_func).reset_index()
-                    st.dataframe(result)
+        elif quick_ops == "Group By (Enhanced)":
+            st.subheader("📊 Group By & Aggregate (Enhanced)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                group_by_cols = st.multiselect(
+                    "Select Column(s) to Group By", 
+                    df.columns.tolist(), 
+                    default=df.columns[0] if len(df.columns) > 0 else None,
+                    key="pd_groupby_group_cols"
+                )
+                
+                st.markdown("##### Define Aggregations:")
+                
+                # Initialize aggregations in session state if not present
+                if 'pd_aggregations' not in st.session_state:
+                    st.session_state.pd_aggregations = [{"Source Column": df.columns[0] if len(df.columns) > 0 else "", 
+                                                         "Aggregation Function": "sum", 
+                                                         "Output Column Name": "sum_of_col"}]
+
+                # Use st.data_editor for dynamic aggregation rules
+                edited_aggregations = st.data_editor(
+                    st.session_state.pd_aggregations,
+                    num_rows="dynamic",
+                    column_config={
+                        "Source Column": st.column_config.SelectboxColumn("Source Column", help="Column to aggregate", options=df.columns.tolist(), required=True),
+                        "Aggregation Function": st.column_config.SelectboxColumn("Function", help="Aggregation function", options=["sum", "mean", "count", "min", "max", "std", "nunique", "first", "last"], required=True),
+                        "Output Column Name": st.column_config.TextColumn("Output Name", help="Name for the aggregated column", required=True)
+                    },
+                    key="pd_groupby_data_editor"
+                )
+                st.session_state.pd_aggregations = edited_aggregations # Update session state
+
+                if st.button("Execute Enhanced Group By", key="pd_execute_groupby"):
+                    if not group_by_cols:
+                        st.error("Please select at least one column to group by.")
+                    elif not edited_aggregations or all(not row["Source Column"] or not row["Output Column Name"] for row in edited_aggregations):
+                        st.error("Please define at least one valid aggregation rule.")
+                    else:
+                        try:
+                            agg_dict = {
+                                row["Output Column Name"]: (row["Source Column"], row["Aggregation Function"])
+                                for row in edited_aggregations if row["Source Column"] and row["Output Column Name"]
+                            }
+                            if not agg_dict:
+                                st.error("No valid aggregations defined.")
+                            else:
+                                result = df.groupby(group_by_cols, as_index=False).agg(**agg_dict)
+                                st.dataframe(result)
+                                # Simple visualization: bar chart of the first group_by col vs first aggregated col
+                                if not result.empty and len(group_by_cols) > 0 and len(agg_dict) > 0:
+                                    first_agg_output_name = list(agg_dict.keys())[0]
+                                    fig = px.bar(result, x=group_by_cols[0], y=first_agg_output_name,
+                                               title=f"Grouped Data: {group_by_cols[0]} vs {first_agg_output_name}")
+                                    st.plotly_chart(fig, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Error executing Group By: {str(e)}")
+
+        elif quick_ops == "Merge/Join":
+            st.subheader("🔗 Merge/Join DataFrames")
+            st.info("This example demonstrates merging the current DataFrame with itself. Adapt for merging two distinct DataFrames.")
+
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    how = st.selectbox("Merge Type (how)", ["left", "right", "outer", "inner", "cross"], key="pd_merge_how")
+                    left_on_cols = st.multiselect("Left On Columns (Key(s) from current DataFrame)", df.columns.tolist(), key="pd_merge_left_on")
+                    use_index_left = st.checkbox("Use Index for Left Join Key", key="pd_merge_left_index")
+                
+                with col2:
+                    # For self-merge, right_on_cols will also be from df.columns
+                    right_on_cols = st.multiselect("Right On Columns (Key(s) from current DataFrame for self-join)", df.columns.tolist(), key="pd_merge_right_on")
+                    use_index_right = st.checkbox("Use Index for Right Join Key", key="pd_merge_right_index")
+
+                suffixes_left = st.text_input("Suffix for Left Overlapping Columns", value="_left", key="pd_merge_suffix_left")
+                suffixes_right = st.text_input("Suffix for Right Overlapping Columns", value="_right", key="pd_merge_suffix_right")
+
+                if st.button("Execute Merge/Join", key="pd_execute_merge"):
+                    try:
+                        # For this example, we merge df with itself.
+                        # In a real scenario with two dataframes df1 and df2:
+                        # result = pd.merge(df1, df2, how=how, left_on=left_on_cols, right_on=right_on_cols, ...)
+                        
+                        # Validate keys if not using index
+                        if not use_index_left and not left_on_cols:
+                            st.error("Please select 'Left On Columns' or check 'Use Index for Left Join Key'.")
+                            return
+                        if not use_index_right and not right_on_cols:
+                             st.error("Please select 'Right On Columns' or check 'Use Index for Right Join Key'.")
+                             return
+                        if how == "cross" and (left_on_cols or right_on_cols or use_index_left or use_index_right):
+                            st.warning("For 'cross' merge, join keys ('on' columns or index) are not used. They will be ignored.")
+                            left_on_cols, right_on_cols, use_index_left, use_index_right = None, None, False, False
+                        
+                        merged_df = pd.merge(
+                            df, df.copy(), # Using df.copy() for the right side to avoid modifying original df if suffixes are applied to same df object
+                            how=how,
+                            left_on=left_on_cols if not use_index_left else None,
+                            right_on=right_on_cols if not use_index_right else None,
+                            left_index=use_index_left,
+                            right_index=use_index_right,
+                            suffixes=(suffixes_left, suffixes_right)
+                        )
+                        st.success(f"Merge completed. Resulting DataFrame has {len(merged_df)} rows and {len(merged_df.columns)} columns.")
+                        st.dataframe(merged_df.head())
+                        st.session_state.df_merged_temp = merged_df # Store for potential further use or download
+                    except Exception as e:
+                        st.error(f"Error during merge: {str(e)}")
+
+        elif quick_ops == "Pivot Table":
+            st.subheader("📊 Pivot Table")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                index_cols = st.multiselect("Index (Rows)", df.columns.tolist(), key="pd_pivot_index")
+                columns_cols = st.multiselect("Columns", df.columns.tolist(), key="pd_pivot_columns")
+                
+                numeric_cols_pivot = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_pivot:
+                    st.warning("No numeric columns available for 'Values' in Pivot Table.")
+                    values_col_pivot = None
+                else:
+                    values_col_pivot = st.selectbox("Values (Numeric Column)", numeric_cols_pivot, key="pd_pivot_values")
+                
+                agg_func_pivot = st.selectbox("Aggregation Function", ["mean", "sum", "count", "min", "max", "std"], key="pd_pivot_aggfunc")
+                fill_value_pivot = st.number_input("Fill Value for Missing Data", value=0, key="pd_pivot_fill")
+
+                if st.button("Create Pivot Table", key="pd_execute_pivot"):
+                    if not index_cols and not columns_cols:
+                        st.error("Please select at least one Index or Columns field.")
+                    elif not values_col_pivot and agg_func_pivot not in ['count']: # Count can work without specific values col if index/columns are set
+                        st.error("Please select a 'Values' column for aggregations other than 'count'.")
+                    else:
+                        try:
+                            # If 'count' is used and no values_col_pivot, pandas might count occurrences based on index/columns.
+                            # If values_col_pivot is None for 'count', it counts non-NA entries for the combinations.
+                            # If aggfunc is 'count' and values_col_pivot is specified, it counts non-NA in that column.
+                            
+                            pivot_df = pd.pivot_table(
+                                df,
+                                index=index_cols if index_cols else None,
+                                columns=columns_cols if columns_cols else None,
+                                values=values_col_pivot if values_col_pivot else None, # Pass None if not selected
+                                aggfunc=agg_func_pivot,
+                                fill_value=fill_value_pivot
+                            )
+                            st.success("Pivot Table created successfully.")
+                            st.dataframe(pivot_df)
+                            st.session_state.df_pivot_temp = pivot_df
+                        except Exception as e:
+                            st.error(f"Error creating Pivot Table: {str(e)}")
+
+        elif quick_ops == "Window Functions":
+            st.subheader("🪟 Window Functions (Rolling/Expanding)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                numeric_cols_window = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_window:
+                    st.warning("No numeric columns available for Window Functions.")
+                else:
+                    value_col_window = st.selectbox("Select Column for Window Function", numeric_cols_window, key="pd_window_value_col")
+                    window_type = st.radio("Window Type", ["Rolling", "Expanding"], key="pd_window_type")
                     
-                    # Visualization
-                    fig = px.bar(result, x=group_col, y=agg_col, 
-                               title=f"{agg_func.title()} of {agg_col} by {group_col}")
-                    st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                    min_periods_window = st.number_input("Minimum Periods", min_value=1, value=1, step=1, key="pd_window_min_periods")
+                    
+                    if window_type == "Rolling":
+                        window_size = st.number_input("Window Size (for Rolling)", min_value=1, value=3, step=1, key="pd_window_size")
+                        center_window = st.checkbox("Center Window (for Rolling)", value=False, key="pd_window_center")
+                    
+                    agg_func_window = st.selectbox(
+                        "Aggregation Function", 
+                        ["mean", "sum", "std", "count", "min", "max", "median", "var", "skew", "kurt"], 
+                        key="pd_window_agg_func"
+                    )
+                    new_col_name_window = st.text_input("New Column Name", value=f"{value_col_window}_{window_type.lower()}_{agg_func_window}", key="pd_window_new_col_name")
+
+                    if st.button("Apply Window Function", key="pd_execute_window"):
+                        if not new_col_name_window.strip():
+                            st.error("Please provide a name for the new column.")
+                        else:
+                            try:
+                                df_copy = df.copy()
+                                if window_type == "Rolling":
+                                    series_window = df_copy[value_col_window].rolling(window=window_size, min_periods=min_periods_window, center=center_window)
+                                else: # Expanding
+                                    series_window = df_copy[value_col_window].expanding(min_periods=min_periods_window)
+                                
+                                # Apply aggregation
+                                df_copy[new_col_name_window] = getattr(series_window, agg_func_window)()
+                                
+                                st.success(f"Applied {window_type} {agg_func_window} to '{value_col_window}', new column '{new_col_name_window}' created.")
+                                st.dataframe(df_copy.head())
+                                st.session_state.df = df_copy # Update main DataFrame
+                            except Exception as e:
+                                st.error(f"Error applying window function: {str(e)}")
+        
+        elif quick_ops == "Melt":
+            st.subheader("🍦 Melt DataFrame")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                id_vars = st.multiselect("Select ID Columns (to keep)", df.columns.tolist(), key="pd_melt_id_vars")
+                value_vars_options = [col for col in df.columns if col not in id_vars]
+                value_vars = st.multiselect("Select Value Columns (to unpivot)", value_vars_options, default=value_vars_options, key="pd_melt_value_vars")
+                
+                var_name = st.text_input("New Variable Column Name:", value="variable", key="pd_melt_var_name")
+                value_name = st.text_input("New Value Column Name:", value="value", key="pd_melt_value_name")
+            
+                if st.button("Execute Melt", key="pd_execute_melt"):
+                    if not id_vars and not value_vars:
+                        st.warning("Melting without id_vars or value_vars will unpivot all columns. This might not be intended.")
+                    if not var_name.strip() or not value_name.strip():
+                        st.error("Please provide names for the new variable and value columns.")
+                    else:
+                        try:
+                            melted_df = df.melt(
+                                id_vars=id_vars if id_vars else None, # Pass None if empty, pandas handles it
+                                value_vars=value_vars if value_vars else None, # Pass None if empty
+                                var_name=var_name,
+                                value_name=value_name
+                            )
+                            st.success(f"Melted DataFrame created with {len(melted_df)} rows.")
+                            st.dataframe(melted_df.head())
+                            st.session_state.df_melt_temp = melted_df
+                        except Exception as e:
+                            st.error(f"Error melting DataFrame: {str(e)}")
         
         elif quick_ops == "Query":
             st.subheader("🔍 DataFrame Query")
             st.info("Use pandas query syntax. Example: column_name > 100 & other_column == 'value'")
             
-            query_str = st.text_input("Query Expression:", "")
+            query_str = st.text_input("Query Expression:", "", key="pd_query_str")
             
-            if query_str and st.button("Execute Query"):
+            if query_str and st.button("Execute Query", key="pd_execute_df_query"):
                 try:
                     result = df.query(query_str)
                     st.success(f"Query returned {len(result)} rows")
@@ -1427,48 +1640,28 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
                 except Exception as e:
                     st.error(f"Query Error: {str(e)}")
         
-        elif quick_ops == "Melt":
-            st.subheader("🍦 Melt DataFrame")
-            id_vars = st.multiselect("Select ID Columns (to keep)", df.columns.tolist())
-            value_vars = st.multiselect("Select Value Columns (to unpivot)", [col for col in df.columns if col not in id_vars])
-            var_name = st.text_input("New Variable Column Name:", value="Variable")
-            value_name = st.text_input("New Value Column Name:", value="Value")
-            
-            if id_vars and value_vars and st.button("Execute Melt"):
-                try:
-                    melted_df = df.melt(
-                        id_vars=id_vars,
-                        value_vars=value_vars,
-                        var_name=var_name,
-                        value_name=value_name
-                    )
-                    st.success(f"Melted DataFrame created with {len(melted_df)} rows.")
-                    st.dataframe(melted_df.head())
-                except Exception as e:
-                    st.error(f"Error melting DataFrame: {str(e)}")
-        
         elif quick_ops == "Apply Function":
             st.subheader("✨ Apply Function to Column")
-            apply_col = st.selectbox("Select Column", df.columns.tolist())
+            apply_col = st.selectbox("Select Column", df.columns.tolist(), key="pd_apply_col")
             st.info("Enter a Python function string. Use 'x' as the element placeholder. Example: `lambda x: x * 2` or `lambda x: str(x).upper()`")
-            function_str = st.text_input("Function (e.g., lambda x: x * 2):")
-            new_col_name = st.text_input("New Column Name (optional):")
+            function_str = st.text_input("Function (e.g., lambda x: x * 2):", key="pd_apply_func_str")
+            new_col_name_apply = st.text_input("New Column Name (optional, if blank, column is modified in-place for preview):", key="pd_apply_new_col_name")
             
-            if apply_col and function_str and st.button("Execute Apply"):
+            if apply_col and function_str and st.button("Execute Apply", key="pd_execute_apply"):
                 try:
                     # Safely evaluate the function string
                     func = eval(function_str)
                     
-                    if new_col_name:
-                        df[new_col_name] = df[apply_col].apply(func)
-                        st.success(f"Applied function to '{apply_col}' and created '{new_col_name}'.")
-                        st.dataframe(df[[apply_col, new_col_name]].head())
+                    if new_col_name_apply.strip():
+                        df[new_col_name_apply] = df[apply_col].apply(func)
+                        st.success(f"Applied function to '{apply_col}' and created '{new_col_name_apply}'.")
+                        st.dataframe(df[[apply_col, new_col_name_apply]].head())
                         st.session_state.df = df # Update session state
                     else:
                         # Apply in place or show result without adding column
                         result = df[apply_col].apply(func)
                         st.success(f"Applied function to '{apply_col}'. Result preview:")
-                        st.write(result.head())
+                        st.dataframe(result.head().to_frame(name=f"{apply_col}_transformed"))
                         
                 except Exception as e:
                     st.error(f"Error applying function: {str(e)}")
@@ -1479,10 +1672,11 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
             pandas_code = st.text_area(
                 "Pandas Code:",
                 value="# Use 'df' to access your data\nresult = df.head()\nprint(result)",
-                height=200
+                height=200,
+                key="pd_custom_code_area"
             )
             
-            if st.button("Execute Pandas Code"):
+            if st.button("Execute Pandas Code", key="pd_execute_custom_code"):
                 try:
                     exec_globals = {'df': df, 'pd': pd, 'np': np}
                     exec(pandas_code, exec_globals)

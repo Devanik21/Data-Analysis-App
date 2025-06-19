@@ -424,21 +424,38 @@ if selected_tool == "📤 Data Upload":
             if numeric_cols_viz:
                 hist_col = st.selectbox("Select numeric column for histogram", numeric_cols_viz, key="viz_hist_col")
                 if hist_col:
-                    fig_hist = px.histogram(df, x=hist_col, title=f"Histogram of {hist_col}", marginal="box")
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                    numeric_chart_type = st.selectbox("Select Chart Type for Numeric Column", 
+                                                      ["Histogram", "Box Plot", "Violin Plot"], 
+                                                      key="viz_numeric_chart_type")
+                    if numeric_chart_type == "Histogram":
+                        fig_numeric = px.histogram(df, x=hist_col, title=f"Histogram of {hist_col}", marginal="box")
+                    elif numeric_chart_type == "Box Plot":
+                        fig_numeric = px.box(df, y=hist_col, title=f"Box Plot of {hist_col}")
+                    elif numeric_chart_type == "Violin Plot":
+                        fig_numeric = px.violin(df, y=hist_col, title=f"Violin Plot of {hist_col}", box=True, points="all")
+                    st.plotly_chart(fig_numeric, use_container_width=True)
             else:
                 st.info("No numeric columns for histogram.")
 
             st.markdown("#### Categorical Column Bar Chart")
             cat_cols_viz = df.select_dtypes(include=['object', 'category']).columns.tolist()
             if cat_cols_viz:
-                bar_col = st.selectbox("Select categorical column for bar chart", cat_cols_viz, key="viz_bar_col")
+                bar_col = st.selectbox("Select categorical column for visualization", cat_cols_viz, key="viz_bar_col")
                 if bar_col:
-                    top_n_cat = st.slider("Show Top N categories", 1, 20, min(10, df[bar_col].nunique()), key="viz_bar_top_n")
+                    cat_chart_type = st.selectbox("Select Chart Type for Categorical Column",
+                                                  ["Bar Chart", "Pie Chart"],
+                                                  key="viz_cat_chart_type")
+                    
+                    top_n_cat = st.slider("Show Top N categories (for Bar/Pie)", 1, 20, min(10, df[bar_col].nunique()), key="viz_cat_top_n")
                     val_counts = df[bar_col].value_counts().nlargest(top_n_cat)
-                    fig_bar = px.bar(val_counts, x=val_counts.index, y=val_counts.values,
-                                     labels={'x': bar_col, 'y': 'Count'}, title=f"Top {top_n_cat} Value Counts for {bar_col}")
-                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                    if cat_chart_type == "Bar Chart":
+                        fig_cat = px.bar(val_counts, x=val_counts.index, y=val_counts.values,
+                                         labels={'x': bar_col, 'y': 'Count'}, title=f"Top {top_n_cat} Value Counts for {bar_col}")
+                    elif cat_chart_type == "Pie Chart":
+                        fig_cat = px.pie(val_counts, names=val_counts.index, values=val_counts.values,
+                                         title=f"Top {top_n_cat} Value Counts for {bar_col}")
+                    st.plotly_chart(fig_cat, use_container_width=True)
             else:
                 st.info("No categorical columns for bar chart.")
 

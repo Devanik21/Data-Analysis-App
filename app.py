@@ -1476,36 +1476,43 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
                 suffixes_right = st.text_input("Suffix for Right Overlapping Columns", value="_right", key="pd_merge_suffix_right")
 
                 if st.button("Execute Merge/Join", key="pd_execute_merge"):
-                    try:
-                        # For this example, we merge df with itself.
-                        # In a real scenario with two dataframes df1 and df2:
-                        # result = pd.merge(df1, df2, how=how, left_on=left_on_cols, right_on=right_on_cols, ...)
-                        
-                        # Validate keys if not using index
-                        if not use_index_left and not left_on_cols:
-                            st.error("Please select 'Left On Columns' or check 'Use Index for Left Join Key'.")
-                            return
-                        if not use_index_right and not right_on_cols:
-                             st.error("Please select 'Right On Columns' or check 'Use Index for Right Join Key'.")
-                             return
-                        if how == "cross" and (left_on_cols or right_on_cols or use_index_left or use_index_right):
-                            st.warning("For 'cross' merge, join keys ('on' columns or index) are not used. They will be ignored.")
-                            left_on_cols, right_on_cols, use_index_left, use_index_right = None, None, False, False
-                        
-                        merged_df = pd.merge(
-                            df, df.copy(), # Using df.copy() for the right side to avoid modifying original df if suffixes are applied to same df object
-                            how=how,
-                            left_on=left_on_cols if not use_index_left else None,
-                            right_on=right_on_cols if not use_index_right else None,
-                            left_index=use_index_left,
-                            right_index=use_index_right,
-                            suffixes=(suffixes_left, suffixes_right)
-                        )
-                        st.success(f"Merge completed. Resulting DataFrame has {len(merged_df)} rows and {len(merged_df.columns)} columns.")
-                        st.dataframe(merged_df.head())
-                        st.session_state.df_merged_temp = merged_df # Store for potential further use or download
-                    except Exception as e:
-                        st.error(f"Error during merge: {str(e)}")
+                    # Validate keys if not using index
+                    if not use_index_left and not left_on_cols:
+                        st.error("Please select 'Left On Columns' or check 'Use Index for Left Join Key'.")
+                    elif not use_index_right and not right_on_cols:
+                         st.error("Please select 'Right On Columns' or check 'Use Index for Right Join Key'.")
+                    elif how == "cross" and (left_on_cols or right_on_cols or use_index_left or use_index_right):
+                        st.warning("For 'cross' merge, join keys ('on' columns or index) are not used. They will be ignored.")
+                        # Proceed with cross merge logic, potentially clearing keys
+                        left_on_cols, right_on_cols, use_index_left, use_index_right = None, None, False, False
+                        try:
+                            merged_df = pd.merge(
+                                df, df.copy(), # Using df.copy() for the right side
+                                how=how,
+                                suffixes=(suffixes_left, suffixes_right)
+                            )
+                            st.success(f"Merge completed. Resulting DataFrame has {len(merged_df)} rows and {len(merged_df.columns)} columns.")
+                            st.dataframe(merged_df.head())
+                            st.session_state.df_merged_temp = merged_df # Store for potential further use or download
+                        except Exception as e:
+                            st.error(f"Error during merge: {str(e)}")
+                    else:
+                        # Execute merge for non-cross types
+                        try:
+                            merged_df = pd.merge(
+                                df, df.copy(), # Using df.copy() for the right side
+                                how=how,
+                                left_on=left_on_cols if not use_index_left else None,
+                                right_on=right_on_cols if not use_index_right else None,
+                                left_index=use_index_left,
+                                right_index=use_index_right,
+                                suffixes=(suffixes_left, suffixes_right)
+                            )
+                            st.success(f"Merge completed. Resulting DataFrame has {len(merged_df)} rows and {len(merged_df.columns)} columns.")
+                            st.dataframe(merged_df.head())
+                            st.session_state.df_merged_temp = merged_df # Store for potential further use or download
+                        except Exception as e:
+                            st.error(f"Error during merge: {str(e)}")
 
         elif quick_ops == "Pivot Table":
             st.subheader("📊 Pivot Table")

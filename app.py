@@ -724,6 +724,158 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             st.markdown(f"**Memory Usage:** {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
             # Further details can be linked from other EDA sections (Missing Values, Outliers)
 
+        elif selected_eda == "🧮 Feature Engineering":
+            st.subheader("🧮 Feature Engineering")
+            
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                fe_type = st.selectbox("Select Feature Engineering Technique", [
+                    "Select a technique...",
+                    "One-Hot Encode Categorical",
+                    "Label Encode Categorical",
+                    "Scale Numeric (StandardScaler)",
+                    "Bin Numeric Column",
+                    "Extract Date/Time Features"
+                ], key="fe_technique_select")
+
+                if fe_type == "One-Hot Encode Categorical":
+                    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+                    if not categorical_cols:
+                        st.warning("No categorical columns found for One-Hot Encoding.")
+                    else:
+                        col_to_encode = st.selectbox("Select Column to One-Hot Encode", categorical_cols, key="fe_ohe_col")
+                        prefix = st.text_input("Prefix for new columns (optional):", value=col_to_encode, key="fe_ohe_prefix")
+                        if st.button("Apply One-Hot Encoding", key="fe_execute_ohe"):
+                            try:
+                                # Drop original column to avoid redundancy
+                                df_processed = pd.get_dummies(df, columns=[col_to_encode], prefix=prefix, dummy_na=False)
+                                st.success(f"Applied One-Hot Encoding to '{col_to_encode}'. New shape: {df_processed.shape}")
+                                st.dataframe(df_processed.head())
+                                st.session_state.df = df_processed # Update main DataFrame
+                            except Exception as e:
+                                st.error(f"Error applying One-Hot Encoding: {str(e)}")
+
+                elif fe_type == "Label Encode Categorical":
+                    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+                    if not categorical_cols:
+                        st.warning("No categorical columns found for Label Encoding.")
+                    else:
+                        col_to_encode = st.selectbox("Select Column to Label Encode", categorical_cols, key="fe_label_col")
+                        new_col_name = st.text_input("New Column Name (optional, default is original_encoded):", value=f"{col_to_encode}_encoded", key="fe_label_new_col")
+                        if st.button("Apply Label Encoding", key="fe_execute_label"):
+                            try:
+                                le = LabelEncoder()
+                                # Handle potential NaNs before encoding
+                                if df[col_to_encode].isnull().any():
+                                    st.warning(f"Column '{col_to_encode}' contains missing values. LabelEncoder does not handle NaNs by default. NaNs will remain NaN in the new column.")
+                                
+                                # Create a copy to avoid SettingWithCopyWarning
+                                df_processed = df.copy()
+                                df_processed[new_col_name if new_col_name else f"{col_to_encode}_encoded"] = le.fit_transform(df_processed[col_to_encode].astype(str)) # Encode as string to handle NaNs and non-string types gracefully
+                                st.success(f"Applied Label Encoding to '{col_to_encode}'. Created '{new_col_name if new_col_name else f'{col_to_encode}_encoded'}'.")
+                                st.dataframe(df_processed[[col_to_encode, new_col_name if new_col_name else f"{col_to_encode}_encoded"]].head())
+                                st.session_state.df = df_processed # Update main DataFrame
+                            except Exception as e:
+                                st.error(f"Error applying Label Encoding: {str(e)}")
+
+                elif fe_type == "Scale Numeric (StandardScaler)":
+                    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if not numeric_cols:
+                        st.warning("No numeric columns found for Scaling.")
+                    else:
+                        cols_to_scale = st.multiselect("Select Column(s) to Scale", numeric_cols, key="fe_scale_cols")
+                        prefix = st.text_input("Prefix for new columns (optional):", value="scaled", key="fe_scale_prefix")
+                        if st.button("Apply StandardScaler", key="fe_execute_scale"):
+                            if not cols_to_scale:
+                                st.warning("Please select at least one column to scale.")
+                            else:
+                                try:
+                                    scaler = StandardScaler()
+                                    # Create a copy to avoid SettingWithCopyWarning
+                                    df_processed = df.copy()
+                                    
+                                    scaled_data = scaler.fit_transform(df_processed[cols_to_scale])
+                                    
+                                    # Create new column names
+                                    new_col_names = [f"{prefix}_{col}" for col in cols_to_scale]
+                                    
+                                    # Add scaled data to the DataFrame
+                                    df_processed[new_col_names] = scaled_data
+                                    
+                                    st.success(f"Applied StandardScaler to {len(cols_to_scale)} column(s).")
+                                    st.dataframe(df_processed[[*cols_to_scale, *new_col_names]].head())
+                                    st.session_state.df = df_processed # Update main DataFrame
+                                except Exception as e:
+                                    st.error(f"Error applying StandardScaler: {str(e)}")
+
+                elif fe_type == "Bin Numeric Column":
+                    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if not numeric_cols:
+                        st.warning("No numeric columns found for Binning.")
+                    else:
+                        col_to_bin = st.selectbox("Select Column to Bin", numeric_cols, key="fe_bin_col")
+                        num_bins = st.number_input("Number of Bins:", min_value=2, value=10, step=1, key="fe_bin_num")
+                        new_col_name = st.text_input("New Column Name:", value=f"{col_to_bin}_binned", key="fe_bin_new_col")
+                        if st.button("Apply Binning", key="fe_execute_bin"):
+                            if not new_col_name.strip():
+                                st.error("Please provide a name for the new column.")
+                            else:
+                                try:
+                                    # Create a copy to avoid SettingWithCopyWarning
+                                    df_processed = df.copy()
+                                    # Use pd.cut for binning
+                                    df_processed[new_col_name] = pd.cut(df_processed[col_to_bin], bins=num_bins, labels=False, include_lowest=True)
+                                    st.success(f"Applied Binning to '{col_to_bin}' into {num_bins} bins. Created '{new_col_name}'.")
+                                    st.dataframe(df_processed[[col_to_bin, new_col_name]].head())
+                                    st.session_state.df = df_processed # Update main DataFrame
+                                except Exception as e:
+                                    st.error(f"Error applying Binning: {str(e)}")
+
+                elif fe_type == "Extract Date/Time Features":
+                    datetime_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+                    if not datetime_cols:
+                        st.warning("No datetime columns found. Please convert a column to datetime first (e.g., in Time Series Analysis).")
+                    else:
+                        col_to_extract = st.selectbox("Select Datetime Column", datetime_cols, key="fe_datetime_col")
+                        features_to_extract = st.multiselect("Select Features to Extract", ["Year", "Month", "Day", "Hour", "Minute", "Second", "Day of Week", "Day of Year", "Week of Year", "Quarter"], key="fe_datetime_features")
+                        if st.button("Extract Features", key="fe_execute_datetime"):
+                            if not features_to_extract:
+                                st.warning("Please select at least one feature to extract.")
+                            else:
+                                try:
+                                    # Create a copy to avoid SettingWithCopyWarning
+                                    df_processed = df.copy()
+                                    
+                                    for feature in features_to_extract:
+                                        new_col_name = f"{col_to_extract}_{feature.lower().replace(' ', '_')}"
+                                        if feature == "Year":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.year
+                                        elif feature == "Month":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.month
+                                        elif feature == "Day":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.day
+                                        elif feature == "Hour":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.hour
+                                        elif feature == "Minute":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.minute
+                                        elif feature == "Second":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.second
+                                        elif feature == "Day of Week":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.dayofweek # Monday=0, Sunday=6
+                                        elif feature == "Day of Year":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.dayofyear
+                                        elif feature == "Week of Year":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.isocalendar().week.astype(int) # Use isocalendar for week
+                                        elif feature == "Quarter":
+                                            df_processed[new_col_name] = df_processed[col_to_extract].dt.quarter
+                                    
+                                    st.success(f"Extracted {len(features_to_extract)} features from '{col_to_extract}'.")
+                                    st.dataframe(df_processed[[col_to_extract] + [f"{col_to_extract}_{f.lower().replace(' ', '_')}" for f in features_to_extract]].head())
+                                    st.session_state.df = df_processed # Update main DataFrame
+                                except Exception as e:
+                                    st.error(f"Error extracting datetime features: {str(e)}")
+
 elif selected_tool == "📈 Excel Query Tool":
     st.markdown('<h2 class="tool-header">📈 Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
 

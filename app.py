@@ -841,6 +841,38 @@ Split `full_name` by space into `first_name` and `last_name`
                 sorted_df = df.sort_values(by=sort_col, ascending=ascending)
                 st.dataframe(sorted_df)
         
+        elif operation == "GROUPBY":
+            st.subheader("📊 Group By & Aggregate")
+            
+            # Ensure df has columns before proceeding
+            if df.empty or len(df.columns) == 0:
+                st.warning("DataFrame is empty or has no columns to perform GroupBy.")
+            else:
+                group_col = st.selectbox("Group By Column", df.columns.tolist(), key="excel_groupby_group_col")
+                
+                numeric_cols_for_agg = df.select_dtypes(include=[np.number]).columns.tolist()
+                if not numeric_cols_for_agg:
+                    st.warning("No numeric columns available for aggregation functions like sum, mean, etc. 'Count' can still be used.")
+                    # Allow selection of any column for 'count', or the group_col itself
+                    agg_col_options = df.columns.tolist()
+                else:
+                    agg_col_options = numeric_cols_for_agg
+                
+                agg_col = st.selectbox("Aggregate Column", agg_col_options, key="excel_groupby_agg_col")
+                agg_func = st.selectbox("Aggregation Function", ["sum", "mean", "count", "min", "max", "std"], key="excel_groupby_agg_func")
+                
+                if st.button("Execute Group By", key="excel_execute_groupby"):
+                    try:
+                        result = df.groupby(group_col)[agg_col].agg(agg_func).reset_index()
+                        st.dataframe(result)
+                        
+                        # Visualization
+                        fig = px.bar(result, x=group_col, y=agg_col, 
+                                   title=f"{agg_func.title()} of {agg_col} by {group_col}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error executing Group By: {str(e)}")
+        
         elif operation in ["SUMIF", "COUNTIF", "AVERAGEIF"]:
             st.subheader(f"🧮 {operation} Operation")
             condition_col = st.selectbox("Condition Column", df.columns.tolist())

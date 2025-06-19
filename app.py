@@ -440,7 +440,8 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             "📊 Missing Value Analysis",
             "🏷️ Categorical Analysis",
             "⏰ Time Series Analysis",
-            "🔢 Statistical Summary",
+            "🔢 Statistical Summary", # Keep this one
+            "🧬 Multivariate Analysis", # Add new option
             "📋 Data Quality Report",
             "🧮 Feature Engineering"
         ]
@@ -714,6 +715,56 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         else:
                             st.write(f"**Mode:** {modes}")
 
+        elif selected_eda == "🧬 Multivariate Analysis":
+            st.subheader("🧬 Multivariate Analysis")
+            numeric_cols_mv = df.select_dtypes(include=np.number).columns.tolist()
+
+            if len(numeric_cols_mv) < 2:
+                st.warning("Multivariate analysis requires at least two numeric columns.")
+            else:
+                st.markdown("#### 📊 Pair Plot (Scatter Matrix)")
+                st.info("Visualizes pairwise relationships between selected numeric variables. Diagonal shows histograms or KDEs.")
+                
+                pair_plot_cols = st.multiselect(
+                    "Select columns for Pair Plot (2-5 recommended for performance)", 
+                    numeric_cols_mv, 
+                    default=numeric_cols_mv[:min(len(numeric_cols_mv), 4)], # Default to first 4 or fewer
+                    key="mv_pair_plot_cols"
+                )
+                
+                if pair_plot_cols and len(pair_plot_cols) >= 2:
+                    hue_col_pair = st.selectbox("Color by (Categorical Column - Optional)", ['None'] + df.select_dtypes(include=['object', 'category']).columns.tolist(), key="mv_pair_plot_hue")
+                    hue_col_pair = None if hue_col_pair == 'None' else hue_col_pair
+
+                    if st.button("Generate Pair Plot", key="mv_generate_pair_plot"):
+                        with st.spinner("Generating Pair Plot..."):
+                            try:
+                                fig_pair = px.scatter_matrix(df, dimensions=pair_plot_cols, color=hue_col_pair, title="Pair Plot of Selected Variables")
+                                fig_pair.update_layout(height=max(600, 200 * len(pair_plot_cols))) # Adjust height
+                                st.plotly_chart(fig_pair, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating pair plot: {e}")
+                elif pair_plot_cols and len(pair_plot_cols) < 2:
+                    st.warning("Please select at least two columns for the pair plot.")
+
+                st.markdown("---")
+                st.markdown("#### 🧊 3D Scatter Plot")
+                if len(numeric_cols_mv) < 3:
+                    st.info("3D Scatter Plot requires at least three numeric columns.")
+                else:
+                    x_3d = st.selectbox("Select X-axis for 3D Scatter", numeric_cols_mv, index=0, key="mv_3d_x")
+                    y_3d = st.selectbox("Select Y-axis for 3D Scatter", numeric_cols_mv, index=1 if len(numeric_cols_mv) > 1 else 0, key="mv_3d_y")
+                    z_3d = st.selectbox("Select Z-axis for 3D Scatter", numeric_cols_mv, index=2 if len(numeric_cols_mv) > 2 else 0, key="mv_3d_z")
+                    color_3d = st.selectbox("Color by (Optional)", ['None'] + df.columns.tolist(), key="mv_3d_color")
+                    color_3d = None if color_3d == 'None' else color_3d
+                    
+                    if st.button("Generate 3D Scatter Plot", key="mv_generate_3d_scatter"):
+                        with st.spinner("Generating 3D Scatter Plot..."):
+                            try:
+                                fig_3d = px.scatter_3d(df, x=x_3d, y=y_3d, z=z_3d, color=color_3d, title=f"3D Scatter Plot: {x_3d} vs {y_3d} vs {z_3d}")
+                                st.plotly_chart(fig_3d, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating 3D scatter plot: {e}")
 
         elif selected_eda == "📋 Data Quality Report":
             st.subheader("📋 Data Quality Report")

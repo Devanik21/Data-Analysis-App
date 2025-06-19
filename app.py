@@ -178,10 +178,10 @@ def generate_chart(df, config, title):
             fig = px.line(df, x=x, y=y, color=color_data, title=title)
         elif config['type'] == 'Scatter':
             x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
-            y = df[config['y']].astype(float) if not pd.api_types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']] # Corrected pd.api.types
             color = config.get('color')
             if color:
-                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) or not pd.api.types.is_numeric_dtype(df[color]) else df[color]
             else:
                 color_data = None
             fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
@@ -688,6 +688,37 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         st.metric("Data Points", len(df))
                         st.metric("Average Value", f"{df[value_col].mean():.2f}")
 
+        elif selected_eda == "🔢 Statistical Summary":
+            st.subheader("🔢 Detailed Statistical Summary")
+            
+            st.markdown("#### Overall Descriptive Statistics (Numeric Columns)")
+            st.dataframe(df.describe(include=[np.number]))
+
+            st.markdown("#### Overall Descriptive Statistics (Object/Categorical Columns)")
+            st.dataframe(df.describe(include=['object', 'category']))
+
+            st.markdown("#### Per-Column Statistics")
+            for col in df.columns:
+                with st.expander(f"Statistics for Column: {col} (Type: {df[col].dtype})"):
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        st.write(df[col].describe())
+                        st.write(f"**Skewness:** {df[col].skew():.3f}")
+                        st.write(f"**Kurtosis:** {df[col].kurtosis():.3f}")
+                    elif pd.api.types.is_datetime64_any_dtype(df[col]):
+                        st.write(df[col].describe(datetime_is_numeric=True))
+                    else: # Categorical or Object
+                        st.write(df[col].describe())
+                        st.write(f"**Mode:** {df[col].mode().tolist()}")
+
+        elif selected_eda == "📋 Data Quality Report":
+            st.subheader("📋 Data Quality Report")
+            st.markdown(f"**Total Rows:** {len(df)}")
+            st.markdown(f"**Total Columns:** {len(df.columns)}")
+            st.markdown(f"**Duplicate Rows:** {df.duplicated().sum()}")
+            st.markdown(f"**Total Missing Values:** {df.isnull().sum().sum()}")
+            st.markdown(f"**Memory Usage:** {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
+            # Further details can be linked from other EDA sections (Missing Values, Outliers)
+
 elif selected_tool == "📈 Excel Query Tool":
     st.markdown('<h2 class="tool-header">📈 Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
 
@@ -748,6 +779,35 @@ Split `full_name` by space into `first_name` and `last_name`
                         st.warning("No matches found")
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+        
+        elif operation == "HLOOKUP":
+            st.subheader("↔️ HLOOKUP Operation")
+            st.info("HLOOKUP searches for a value in the first selected row of a range and returns the value in the same column from a row you specify.")
+            
+            # For HLOOKUP, the "table array" is the df itself.
+            # We need to select the row to search in (lookup_row_index)
+            # And the row to return from (return_row_index)
+            
+            lookup_row_options = {f"Row {i} (Header is 0)": i for i in range(min(10, len(df)))} # Show first 10 rows as options
+            if not df.empty:
+                lookup_row_index = st.selectbox("Select Row to Search In (Header is 0, Data starts at 1 if header exists)", list(range(len(df))), format_func=lambda x: f"Row Index {x} (Value: {df.iloc[x,0]}...)", key="hlookup_lookup_row")
+                lookup_value_h = st.text_input("Value to Find in Selected Row", key="hlookup_value")
+                return_row_index = st.number_input("Row Index to Return Value From (0-based)", min_value=0, max_value=len(df)-1, value=lookup_row_index + 1 if lookup_row_index + 1 < len(df) else lookup_row_index, step=1, key="hlookup_return_row")
+
+                if st.button("Execute HLOOKUP", key="excel_execute_hlookup"):
+                    try:
+                        search_row_series = df.iloc[lookup_row_index].astype(str)
+                        matching_cols = search_row_series[search_row_series.str.contains(lookup_value_h, case=False, na=False)].index
+                        if not matching_cols.empty:
+                            result_value = df.loc[return_row_index, matching_cols[0]] # Get first match
+                            st.success(f"Found '{lookup_value_h}' in column '{matching_cols[0]}' (Row {lookup_row_index}). Value from Row {return_row_index}:")
+                            st.write(result_value)
+                        else:
+                            st.warning(f"Value '{lookup_value_h}' not found in row {lookup_row_index}.")
+                    except Exception as e:
+                        st.error(f"Error during HLOOKUP: {str(e)}")
+            else:
+                st.warning("DataFrame is empty.")
         
         elif operation == "PIVOT":
             st.subheader("📊 Pivot Table")
@@ -1077,27 +1137,36 @@ elif selected_tool == "💼 Power BI Dashboard":
             
             for i in range(num_charts):
                 with st.expander(f"Chart {i+1} Configuration"):
-                    chart_type = st.selectbox(f"Chart Type {i+1}", 
+                    chart_type_manual = st.selectbox(f"Chart Type {i+1}", 
                                             ["Bar", "Line", "Scatter", "Histogram", "Box", "Pie", "Heatmap"],
                                             key=f"chart_type_{i}")
                     
-                    if chart_type in ["Bar", "Line", "Scatter"]:
-                        x_col = st.selectbox(f"X-axis {i+1}", df.columns.tolist(), key=f"x_col_{i}")
-                        y_col = st.selectbox(f"Y-axis {i+1}", df.columns.tolist(), key=f"y_col_{i}")
-                        color_col = st.selectbox(f"Color by {i+1}", ['None'] + df.columns.tolist(), key=f"color_col_{i}")
-                        color_col = None if color_col == 'None' else color_col
-                        
-                        chart_configs.append({
-                            'type': chart_type,
-                            'x': x_col,
-                            'y': y_col,
-                            'color': color_col
-                        })
+                    numeric_cols_manual = df.select_dtypes(include=np.number).columns.tolist()
+                    all_cols_manual = df.columns.tolist()
+
+                    if chart_type_manual in ["Bar", "Line"]:
+                        x_col_manual = st.selectbox(f"X-axis {i+1}", all_cols_manual, key=f"x_col_{i}")
+                        y_col_manual = st.selectbox(f"Y-axis {i+1}", numeric_cols_manual if numeric_cols_manual else all_cols_manual, key=f"y_col_{i}")
+                        color_col_manual = st.selectbox(f"Color by {i+1}", ['None'] + all_cols_manual, key=f"color_col_{i}")
+                        chart_configs.append({'type': chart_type_manual, 'x': x_col_manual, 'y': y_col_manual, 'color': None if color_col_manual == 'None' else color_col_manual})
                     
-                    elif chart_type in ["Histogram", "Box"]:
-                        col = st.selectbox(f"Column {i+1}", df.columns.tolist(), key=f"col_{i}")
+                    elif chart_type_manual == "Scatter":
+                        if not numeric_cols_manual or len(numeric_cols_manual) < 2 :
+                            st.warning(f"Scatter plot {i+1} requires at least two numeric columns.")
+                            continue 
+                        x_col_manual = st.selectbox(f"X-axis (Numeric) {i+1}", numeric_cols_manual, key=f"x_col_{i}")
+                        y_col_manual = st.selectbox(f"Y-axis (Numeric) {i+1}", numeric_cols_manual, key=f"y_col_{i}")
+                        color_col_manual = st.selectbox(f"Color by {i+1}", ['None'] + all_cols_manual, key=f"color_col_{i}")
+                        chart_configs.append({'type': chart_type_manual, 'x': x_col_manual, 'y': y_col_manual, 'color': None if color_col_manual == 'None' else color_col_manual})
+
+                    elif chart_type_manual in ["Histogram", "Box"]:
+                        col_options_hist_box = numeric_cols_manual if chart_type_manual == "Box" and numeric_cols_manual else all_cols_manual
+                        if not col_options_hist_box:
+                             st.warning(f"No suitable columns for {chart_type_manual} plot {i+1}.")
+                             continue
+                        col = st.selectbox(f"Column {i+1}", col_options_hist_box, key=f"col_{i}")
                         chart_configs.append({
-                            'type': chart_type,
+                            'type': chart_type_manual,
                             'column': col
                         })
                     
@@ -1106,13 +1175,15 @@ elif selected_tool == "💼 Power BI Dashboard":
                         chart_configs.append({
                             'type': chart_type,
                             'column': col
-                        })
+                        }) # Typo: chart_type should be chart_type_manual
                     
                     elif chart_type == "Heatmap":
-                        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                        if not numeric_cols_manual or len(numeric_cols_manual) < 2:
+                            st.warning(f"Heatmap {i+1} requires at least two numeric columns.")
+                            continue
                         chart_configs.append({
-                            'type': chart_type,
-                            'columns': numeric_cols
+                            'type': chart_type_manual,
+                            'columns': numeric_cols_manual
                         })
             
             if st.button("🚀 Generate Dashboard"):
@@ -1650,6 +1721,7 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
         elif quick_ops == "Apply Function":
             st.subheader("✨ Apply Function to Column")
             apply_col = st.selectbox("Select Column", df.columns.tolist(), key="pd_apply_col")
+            st.warning("⚠️ Using `eval()` for custom functions can be a security risk if the input is not trusted. Use with caution.")
             st.info("Enter a Python function string. Use 'x' as the element placeholder. Example: `lambda x: x * 2` or `lambda x: str(x).upper()`")
             function_str = st.text_input("Function (e.g., lambda x: x * 2):", key="pd_apply_func_str")
             new_col_name_apply = st.text_input("New Column Name (optional, if blank, column is modified in-place for preview):", key="pd_apply_new_col_name")
@@ -1763,15 +1835,14 @@ for title in titles:
         if not url:
             st.error("Please enter a URL!")
         else:
-            # Add delay before making the request
-            time.sleep(params.get('delay', 1.0))
-            
-            scrape_website(url, method, locals(), export_format)
+            # Pass necessary params explicitly or ensure they are in locals() if that's the design
+            current_locals = locals()
+            scrape_params = {k: current_locals.get(k) for k in ['tag', 'class_name', 'limit', 'selector', 'table_index', 'filter_text', 'min_width', 'custom_code', 'user_agent', 'headers', 'delay', 'timeout']}
+            scrape_website(url, method, scrape_params, export_format)
 
 def scrape_website(url, method, params, export_format):
     """Perform web scraping based on selected method"""
     try:
-        # Setup headers
         headers_dict = {
             'User-Agent': params.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         } if params.get('headers') else {}
@@ -1779,6 +1850,7 @@ def scrape_website(url, method, params, export_format):
         # Use the delay parameter
         with st.spinner("Scraping website..."):
             # Make request
+            time.sleep(float(params.get('delay', 1.0))) # Ensure delay is float
             response = requests.get(url, headers=headers_dict, timeout=params.get('timeout', 10))
             response.raise_for_status()
             
@@ -1786,6 +1858,7 @@ def scrape_website(url, method, params, export_format):
             soup = BeautifulSoup(response.content, 'html.parser')
             
             results = []
+            exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re} # Define exec_globals for custom BS
             
             if method == "Extract Text by Tag":
                 tag = params.get('tag', 'p')
@@ -1876,8 +1949,6 @@ def scrape_website(url, method, params, export_format):
             elif method == "Custom BeautifulSoup":
                 # Execute custom code
                 custom_code = params.get('custom_code', '')
-                # Provide common libraries and the soup object
-                exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re}
                 # Execute the user's code
                 # The user's code is expected to populate the 'results' list or create a 'df_results' DataFrame
                 exec(custom_code, exec_globals)

@@ -355,7 +355,7 @@ if selected_tool == "📤 Data Upload":
                         df_cleaned.dropna(subset=[missing_col], inplace=True)
                         st.session_state.df = df_cleaned
                         st.success(f"Dropped rows with NaNs in '{missing_col}'. New shape: {df_cleaned.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
 
             st.markdown("#### 🔄 Change Data Type")
             type_col = st.selectbox("Select column to change type", df.columns.tolist(), key="clean_type_col")
@@ -370,7 +370,7 @@ if selected_tool == "📤 Data Upload":
                             df_typed[type_col] = df_typed[type_col].astype(new_type)
                         st.session_state.df = df_typed
                         st.success(f"Converted '{type_col}' to {new_type}.")
-                        st.rerun()
+                        st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Error converting type: {e}")
 
@@ -380,7 +380,7 @@ if selected_tool == "📤 Data Upload":
                 removed_count = len(df) - len(df_no_duplicates)
                 st.session_state.df = df_no_duplicates
                 st.success(f"Removed {removed_count} duplicate rows. New shape: {df_no_duplicates.shape}")
-                st.rerun()
+                st.experimental_rerun()
 
             st.markdown("#### ✏️ Rename Columns")
             col_to_rename = st.selectbox("Select column to rename", df.columns.tolist(), key="rename_col_select")
@@ -392,7 +392,7 @@ if selected_tool == "📤 Data Upload":
                         df_renamed.rename(columns={col_to_rename: new_col_name_rename}, inplace=True)
                         st.session_state.df = df_renamed
                         st.success(f"Column '{col_to_rename}' renamed to '{new_col_name_rename}'.")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.warning("Please enter a valid new column name different from the original.")
             
@@ -403,7 +403,7 @@ if selected_tool == "📤 Data Upload":
                     df_dropped = df.drop(columns=cols_to_drop)
                     st.session_state.df = df_dropped
                     st.success(f"Dropped columns: {', '.join(cols_to_drop)}. New shape: {df_dropped.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
                 else:
                     st.warning("Please select at least one column to drop.")
 
@@ -1125,8 +1125,9 @@ Split `full_name` by space into `first_name` and `last_name`
         st.subheader("🔧 Excel-Style Operations")
         
         operation = st.selectbox("Select Operation", [
-            "VLOOKUP", "HLOOKUP", "PIVOT", "FILTER", "SORT", "GROUPBY", 
-            "SUMIF", "COUNTIF", "AVERAGEIF", "CONCATENATE", "SPLIT"
+            "VLOOKUP", "HLOOKUP", "INDEX/MATCH", "PIVOT", "FILTER", "SORT", "GROUPBY", 
+            "SUMIF", "COUNTIF", "AVERAGEIF", "CONCATENATE", "SPLIT",
+            "Text: LEFT/RIGHT/MID", "Text: FIND/REPLACE", "Text: TRIM/UPPER/LOWER/LEN", "Math: ROUND/ABS/SQRT", "Math: POWER/MOD", "Statistical: RANK/PERCENTILE", "Logical: IF (Conditional Column)", "Data: Transpose", "Data: Fill Down/Up", "Date/Time: Extract Component"
         ])
         
         if operation == "VLOOKUP":
@@ -1172,6 +1173,33 @@ Split `full_name` by space into `first_name` and `last_name`
                             st.warning(f"Value '{lookup_value_h}' not found in row {lookup_row_index}.")
                     except Exception as e:
                         st.error(f"Error during HLOOKUP: {str(e)}")
+            else:
+                st.warning("DataFrame is empty.")
+
+        elif operation == "INDEX/MATCH":
+            st.subheader("🔍 INDEX/MATCH Operation")
+            st.info("Simulates Excel's INDEX/MATCH to find a value in a 'return' column based on matching a 'lookup' value in a 'lookup' column.")
+            
+            if not df.empty:
+                lookup_value_im = st.text_input("Lookup Value", key="im_lookup_value")
+                lookup_col_im = st.selectbox("Lookup Column", df.columns.tolist(), key="im_lookup_col")
+                return_col_im = st.selectbox("Return Column", df.columns.tolist(), key="im_return_col")
+                
+                if st.button("Execute INDEX/MATCH", key="excel_execute_index_match"):
+                    try:
+                        # Find the index of the first match in the lookup column
+                        # Use .astype(str) to handle various data types in lookup
+                        match_indices = df[lookup_col_im].astype(str).str.contains(lookup_value_im, case=False, na=False)
+                        
+                        if match_indices.any():
+                            # Get the value from the return column at the first matching index
+                            result_value = df.loc[match_indices, return_col_im].iloc[0]
+                            st.success(f"Found '{lookup_value_im}' in column '{lookup_col_im}'. Corresponding value in '{return_col_im}':")
+                            st.write(result_value)
+                        else:
+                            st.warning(f"Value '{lookup_value_im}' not found in column '{lookup_col_im}'.")
+                    except Exception as e:
+                        st.error(f"Error during INDEX/MATCH: {str(e)}")
             else:
                 st.warning("DataFrame is empty.")
         
@@ -1375,6 +1403,363 @@ Split `full_name` by space into `first_name` and `last_name`
                     st.session_state.df = df # Update session state
                 except Exception as e:
                     st.error("Selected column is not numeric")
+
+        elif operation == "Text: LEFT/RIGHT/MID":
+            st.subheader("📝 Text Extraction (LEFT, RIGHT, MID)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                text_col = st.selectbox("Select Text Column", df.columns.tolist(), key="text_extract_col")
+                extract_type = st.radio("Extraction Type", ["LEFT", "RIGHT", "MID"], key="text_extract_type")
+                
+                if extract_type in ["LEFT", "RIGHT"]:
+                    num_chars = st.number_input("Number of Characters", min_value=1, value=5, step=1, key="text_extract_num")
+                elif extract_type == "MID":
+                    start_num = st.number_input("Start Position (1-based)", min_value=1, value=1, step=1, key="text_extract_start")
+                    num_chars = st.number_input("Number of Characters", min_value=1, value=5, step=1, key="text_extract_mid_num")
+                
+                new_col_name_text_extract = st.text_input("New Column Name:", value=f"{text_col}_{extract_type.lower()}", key="text_extract_new_col")
+
+                if st.button("Execute Text Extraction", key="excel_execute_text_extract"):
+                    if not new_col_name_text_extract.strip():
+                         st.error("Please provide a name for the new column.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Ensure column is string type and handle NaNs
+                            text_series = df_copy[text_col].astype(str).fillna('')
+                            
+                            if extract_type == "LEFT":
+                                df_copy[new_col_name_text_extract] = text_series.str[:num_chars]
+                            elif extract_type == "RIGHT":
+                                df_copy[new_col_name_text_extract] = text_series.str[-num_chars:]
+                            elif extract_type == "MID":
+                                # Pandas .str.slice is 0-indexed, end is exclusive
+                                df_copy[new_col_name_text_extract] = text_series.str.slice(start=start_num-1, stop=start_num-1 + num_chars)
+                            
+                            st.success(f"Applied {extract_type} to '{text_col}'. Created '{new_col_name_text_extract}'.")
+                            st.dataframe(df_copy[[text_col, new_col_name_text_extract]].head())
+                            st.session_state.df = df_copy # Update main DataFrame
+                        except Exception as e:
+                            st.error(f"Error applying text extraction: {str(e)}")
+
+        elif operation == "Text: FIND/REPLACE":
+            st.subheader("📝 Text Find & Replace")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                text_col_fr = st.selectbox("Select Text Column", df.columns.tolist(), key="text_fr_col")
+                find_text = st.text_input("Text to Find:", key="text_fr_find")
+                replace_with = st.text_input("Replace With:", value="", key="text_fr_replace")
+                replace_all = st.checkbox("Replace All occurrences (vs. first)", value=True, key="text_fr_replace_all")
+                new_col_name_text_fr = st.text_input("New Column Name (optional, modifies in-place if blank):", key="text_fr_new_col")
+
+                if st.button("Execute Find/Replace", key="excel_execute_text_fr"):
+                    if not find_text:
+                        st.error("Please enter text to find.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Ensure column is string type and handle NaNs
+                            text_series = df_copy[text_col_fr].astype(str).fillna('')
+                            
+                            if new_col_name_text_fr.strip():
+                                df_copy[new_col_name_text_fr] = text_series.str.replace(find_text, replace_with, regex=False, n=-1 if replace_all else 1)
+                                st.success(f"Applied Replace to '{text_col_fr}'. Created '{new_col_name_text_fr}'.")
+                                st.dataframe(df_copy[[text_col_fr, new_col_name_text_fr]].head())
+                                st.session_state.df = df_copy # Update main DataFrame
+                            else:
+                                # Modify in-place for preview
+                                df_copy[text_col_fr] = text_series.str.replace(find_text, replace_with, regex=False, n=-1 if replace_all else 1)
+                                st.success(f"Applied Replace to '{text_col_fr}' (in-place preview).")
+                                st.dataframe(df_copy[[text_col_fr]].head())
+                                # Note: In-place modification in preview mode doesn't update session_state.df
+
+                        except Exception as e:
+                            st.error(f"Error applying Find/Replace: {str(e)}")
+
+        elif operation == "Text: TRIM/UPPER/LOWER/LEN":
+            st.subheader("📝 Text Formatting (TRIM, UPPER, LOWER, LEN)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                text_col_format = st.selectbox("Select Text Column", df.columns.tolist(), key="text_format_col")
+                format_type = st.radio("Formatting Type", ["TRIM", "UPPER", "LOWER", "LEN"], key="text_format_type")
+                new_col_name_text_format = st.text_input("New Column Name (optional, modifies in-place if blank for TRIM/UPPER/LOWER):", key="text_format_new_col")
+
+                if st.button("Execute Text Formatting", key="excel_execute_text_format"):
+                    if format_type == "LEN" and not new_col_name_text_format.strip():
+                         st.error("Please provide a name for the new column when using LEN.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Ensure column is string type and handle NaNs
+                            text_series = df_copy[text_col_format].astype(str).fillna('')
+                            
+                            if format_type == "TRIM":
+                                result_series = text_series.str.strip()
+                            elif format_type == "UPPER":
+                                result_series = text_series.str.upper()
+                            elif format_type == "LOWER":
+                                result_series = text_series.str.lower()
+                            elif format_type == "LEN":
+                                result_series = text_series.str.len()
+                            
+                            if new_col_name_text_format.strip():
+                                df_copy[new_col_name_text_format] = result_series
+                                st.success(f"Applied {format_type} to '{text_col_format}'. Created '{new_col_name_text_format}'.")
+                                st.dataframe(df_copy[[text_col_format, new_col_name_text_format]].head())
+                                st.session_state.df = df_copy # Update main DataFrame
+                            else:
+                                # Modify in-place for preview (only for TRIM, UPPER, LOWER)
+                                if format_type in ["TRIM", "UPPER", "LOWER"]:
+                                     df_copy[text_col_format] = result_series
+                                     st.success(f"Applied {format_type} to '{text_col_format}' (in-place preview).")
+                                     st.dataframe(df_copy[[text_col_format]].head())
+                                else: # LEN requires a new column
+                                     st.error("LEN operation requires a new column name.")
+
+                        except Exception as e:
+                            st.error(f"Error applying text formatting: {str(e)}")
+
+        elif operation == "Math: ROUND/ABS/SQRT":
+            st.subheader("🧮 Math Operations (ROUND, ABS, SQRT)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                numeric_cols_math1 = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_math1:
+                    st.warning("No numeric columns found for Math operations.")
+                else:
+                    math_col1 = st.selectbox("Select Numeric Column", numeric_cols_math1, key="math1_col")
+                    math_type1 = st.radio("Math Operation", ["ROUND", "ABS", "SQRT"], key="math1_type")
+                    
+                    if math_type1 == "ROUND":
+                        decimals = st.number_input("Number of Decimals", min_value=0, value=2, step=1, key="math1_round_decimals")
+                    
+                    new_col_name_math1 = st.text_input("New Column Name (optional, modifies in-place if blank):", key="math1_new_col")
+
+                    if st.button("Execute Math Operation", key="excel_execute_math1"):
+                        try:
+                            df_copy = df.copy()
+                            
+                            if math_type1 == "ROUND":
+                                result_series = df_copy[math_col1].round(decimals)
+                            elif math_type1 == "ABS":
+                                result_series = df_copy[math_col1].abs()
+                            elif math_type1 == "SQRT":
+                                # Handle potential negative values for SQRT
+                                if (df_copy[math_col1] < 0).any():
+                                    st.warning(f"Column '{math_col1}' contains negative values. SQRT will result in NaN for these.")
+                                result_series = np.sqrt(df_copy[math_col1])
+                            
+                            if new_col_name_math1.strip():
+                                df_copy[new_col_name_math1] = result_series
+                                st.success(f"Applied {math_type1} to '{math_col1}'. Created '{new_col_name_math1}'.")
+                                st.dataframe(df_copy[[math_col1, new_col_name_math1]].head())
+                                st.session_state.df = df_copy # Update main DataFrame
+                            else:
+                                # Modify in-place for preview
+                                df_copy[math_col1] = result_series
+                                st.success(f"Applied {math_type1} to '{math_col1}' (in-place preview).")
+                                st.dataframe(df_copy[[math_col1]].head())
+
+                        except Exception as e:
+                            st.error(f"Error applying math operation: {str(e)}")
+
+        elif operation == "Math: POWER/MOD":
+            st.subheader("🧮 Math Operations (POWER, MOD)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                numeric_cols_math2 = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_math2:
+                    st.warning("No numeric columns found for Math operations.")
+                else:
+                    math_type2 = st.radio("Math Operation", ["POWER", "MOD"], key="math2_type")
+                    math_col2 = st.selectbox("Select Numeric Column", numeric_cols_math2, key="math2_col")
+                    
+                    if math_type2 == "POWER":
+                        power_value = st.number_input("Power:", value=2.0, step=0.1, key="math2_power_value")
+                        new_col_name_math2 = st.text_input("New Column Name:", value=f"{math_col2}_power_{power_value}", key="math2_new_col")
+                    elif math_type2 == "MOD":
+                        divisor_value = st.number_input("Divisor:", value=2.0, step=0.1, key="math2_mod_divisor")
+                        new_col_name_math2 = st.text_input("New Column Name:", value=f"{math_col2}_mod_{divisor_value}", key="math2_new_col")
+
+                    if st.button("Execute Math Operation", key="excel_execute_math2"):
+                         if not new_col_name_math2.strip():
+                             st.error("Please provide a name for the new column.")
+                         else:
+                            try:
+                                df_copy = df.copy()
+                                
+                                if math_type2 == "POWER":
+                                    result_series = df_copy[math_col2] ** power_value
+                                elif math_type2 == "MOD":
+                                    # Handle division by zero
+                                    if divisor_value == 0:
+                                        st.error("Divisor cannot be zero for MOD operation.")
+                                        return
+                                    result_series = df_copy[math_col2] % divisor_value
+                                
+                                df_copy[new_col_name_math2] = result_series
+                                st.success(f"Applied {math_type2} to '{math_col2}'. Created '{new_col_name_math2}'.")
+                                st.dataframe(df_copy[[math_col2, new_col_name_math2]].head())
+                                st.session_state.df = df_copy # Update main DataFrame
+
+                            except Exception as e:
+                                st.error(f"Error applying math operation: {str(e)}")
+
+        elif operation == "Statistical: RANK/PERCENTILE":
+            st.subheader("📊 Statistical Operations (RANK, PERCENTILE)")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                numeric_cols_stat = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_stat:
+                    st.warning("No numeric columns found for Statistical operations.")
+                else:
+                    stat_col = st.selectbox("Select Numeric Column", numeric_cols_stat, key="stat_col")
+                    stat_type = st.radio("Statistical Operation", ["RANK", "PERCENTILE"], key="stat_type")
+                    
+                    if stat_type == "RANK":
+                        rank_method = st.selectbox("Rank Method", ["average", "min", "max", "first", "dense"], key="stat_rank_method")
+                        rank_ascending = st.checkbox("Ascending Rank", value=True, key="stat_rank_ascending")
+                        new_col_name_rank = st.text_input("New Column Name:", value=f"{stat_col}_rank", key="stat_rank_new_col")
+                    elif stat_type == "PERCENTILE":
+                        percentile_value = st.slider("Percentile (0-100)", 0, 100, 50, key="stat_percentile_value")
+                        new_col_name_percentile = st.text_input("New Column Name:", value=f"{stat_col}_percentile", key="stat_percentile_new_col")
+
+                    if st.button("Execute Statistical Operation", key="excel_execute_stat"):
+                         if (stat_type == "RANK" and not new_col_name_rank.strip()) or (stat_type == "PERCENTILE" and not new_col_name_percentile.strip()):
+                             st.error("Please provide a name for the new column.")
+                         else:
+                            try:
+                                df_copy = df.copy()
+                                
+                                if stat_type == "RANK":
+                                    df_copy[new_col_name_rank] = df_copy[stat_col].rank(method=rank_method, ascending=rank_ascending)
+                                    st.success(f"Applied RANK to '{stat_col}'. Created '{new_col_name_rank}'.")
+                                    st.dataframe(df_copy[[stat_col, new_col_name_rank]].head())
+                                elif stat_type == "PERCENTILE":
+                                    # Calculate the percentile value across the series
+                                    percentile_val = df_copy[stat_col].quantile(percentile_value / 100.0)
+                                    # Create a new column indicating if the value is >= the percentile value (or just store the percentile value itself?)
+                                    # Excel's PERCENTILE.INC/EXC returns a single value. Let's return the value.
+                                    st.metric(f"{percentile_value}th Percentile of '{stat_col}'", f"{percentile_val:.2f}")
+                                    # Or, create a column indicating if each row is above/below that percentile? Let's do the latter for a new column.
+                                    df_copy[new_col_name_percentile] = (df_copy[stat_col] >= percentile_val).astype(int) # 1 if >= percentile, 0 otherwise
+                                    st.success(f"Calculated {percentile_value}th percentile ({percentile_val:.2f}) for '{stat_col}'. Created '{new_col_name_percentile}' (1 if >= percentile, 0 otherwise).")
+                                    st.dataframe(df_copy[[stat_col, new_col_name_percentile]].head())
+
+                                st.session_state.df = df_copy # Update main DataFrame
+
+                            except Exception as e:
+                                st.error(f"Error applying statistical operation: {str(e)}")
+
+        elif operation == "Logical: IF (Conditional Column)":
+            st.subheader("🧠 Logical IF (Create Conditional Column)")
+            st.info("Creates a new column based on a condition applied to another column.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                condition_col_if = st.selectbox("Select Column for Condition", df.columns.tolist(), key="if_condition_col")
+                condition_logic = st.text_input("Condition Logic (e.g., > 100, == 'Active', .isnull()):", key="if_condition_logic")
+                value_if_true = st.text_input("Value if True:", key="if_value_true")
+                value_if_false = st.text_input("Value if False:", key="if_value_false")
+                new_col_name_if = st.text_input("New Column Name:", value=f"{condition_col_if}_conditional", key="if_new_col")
+
+                if st.button("Execute IF", key="excel_execute_if"):
+                    if not condition_logic.strip() or not new_col_name_if.strip():
+                        st.error("Please provide condition logic and a new column name.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            
+                            # Safely evaluate the condition logic
+                            # This is still using eval, caution advised.
+                            # A safer approach would be specific UI for common conditions (>, <, ==, is null, contains)
+                            condition_expr = f"df_copy['{condition_col_if}']{condition_logic}"
+                            condition_mask = eval(condition_expr)
+                            
+                            df_copy[new_col_name_if] = np.where(condition_mask, value_if_true, value_if_false)
+                            
+                            st.success(f"Applied IF logic to '{condition_col_if}'. Created '{new_col_name_if}'.")
+                            st.dataframe(df_copy[[condition_col_if, new_col_name_if]].head())
+                            st.session_state.df = df_copy # Update main DataFrame
+
+                        except Exception as e:
+                            st.error(f"Error applying IF logic: {str(e)}")
+                            st.info("Ensure your condition logic is valid Python syntax for a boolean expression on a Pandas Series.")
+
+        elif operation == "Data: Transpose":
+            st.subheader("↔️ Transpose DataFrame")
+            st.info("Swaps rows and columns. The original index becomes columns, and original columns become the index.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                if st.button("Execute Transpose", key="excel_execute_transpose"):
+                    try:
+                        transposed_df = df.T
+                        st.success(f"DataFrame transposed. New shape: {transposed_df.shape}")
+                        st.dataframe(transposed_df)
+                        st.session_state.df_transposed_temp = transposed_df # Store for potential download
+                    except Exception as e:
+                        st.error(f"Error transposing DataFrame: {str(e)}")
+
+        elif operation == "Data: Fill Down/Up":
+            st.subheader("💧 Fill Missing Values (Fill Down/Up)")
+            st.info("Fills NaN values using the previous (Fill Down) or next (Fill Up) valid observation.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                fill_col_fillna = st.selectbox("Select Column to Fill", df.columns.tolist(), key="fillna_col")
+                fill_direction = st.radio("Fill Direction", ["Fill Down (ffill)", "Fill Up (bfill)"], key="fillna_direction")
+                
+                if st.button("Execute Fill", key="excel_execute_fillna"):
+                    try:
+                        df_copy = df.copy()
+                        if fill_direction == "Fill Down (ffill)":
+                            df_copy[fill_col_fillna].fillna(method='ffill', inplace=True)
+                        elif fill_direction == "Fill Up (bfill)":
+                            df_copy[fill_col_fillna].fillna(method='bfill', inplace=True)
+                        
+                        st.success(f"Applied {fill_direction} to '{fill_col_fillna}'.")
+                        st.dataframe(df_copy[[fill_col_fillna]].head())
+                        st.session_state.df = df_copy # Update main DataFrame
+
+                    except Exception as e:
+                        st.error(f"Error applying fill operation: {str(e)}")
+
+        elif operation == "Date/Time: Extract Component":
+            st.subheader("⏰ Extract Date/Time Component")
+            st.info("Extracts components like Year, Month, Day, Hour, etc., from a datetime column.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                datetime_cols_extract = df.select_dtypes(include=['datetime64']).columns.tolist()
+                if not datetime_cols_extract:
+                    st.warning("No datetime columns found. Please convert a column to datetime first (e.g., in Data Upload or EDA).")
+                else:
+                    col_to_extract_dt = st.selectbox("Select Datetime Column", datetime_cols_extract, key="dt_extract_col")
+                    component_to_extract = st.selectbox("Select Component to Extract", ["year", "month", "day", "hour", "minute", "second", "dayofweek", "dayofyear", "week", "quarter"], key="dt_extract_component")
+                    new_col_name_dt_extract = st.text_input("New Column Name:", value=f"{col_to_extract_dt}_{component_to_extract}", key="dt_extract_new_col")
+
+                    if st.button("Execute Extraction", key="excel_execute_dt_extract"):
+                         if not new_col_name_dt_extract.strip():
+                             st.error("Please provide a name for the new column.")
+                         else:
+                            try:
+                                df_copy = df.copy()
+                                # Use .dt accessor
+                                df_copy[new_col_name_dt_extract] = getattr(df_copy[col_to_extract_dt].dt, component_to_extract)
+                                
+                                st.success(f"Extracted '{component_to_extract}' from '{col_to_extract_dt}'. Created '{new_col_name_dt_extract}'.")
+                                st.dataframe(df_copy[[col_to_extract_dt, new_col_name_dt_extract]].head())
+                                st.session_state.df = df_copy # Update main DataFrame
+
+                            except Exception as e:
+                                st.error(f"Error extracting datetime component: {str(e)}")
 
 elif selected_tool == "💼 Power BI Dashboard":
     st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)
@@ -1670,7 +2055,7 @@ print(df_clean.info())"""
                     st.caption(f"Executed: {entry['timestamp']}")
                     if st.button(f"Reuse Code {len(st.session_state.python_history) - i}", key=f"reuse_{i}"):
                         st.session_state.python_code = entry['code']
-                        st.rerun()
+                        st.experimental_rerun()
 
 elif selected_tool == "🐼 Pandas Query Tool":
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

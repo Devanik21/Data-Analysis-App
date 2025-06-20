@@ -156,63 +156,63 @@ def advanced_outlier_detection(df, column):
 
 def generate_chart(df, config, title):
     """Generate chart based on configuration"""
-try:
-    if config['type'] == 'Bar':
-        # Ensure x and y are serializable
-        x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
-        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-        color = config.get('color')
-        if color:
-            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
-        else:
-            color_data = None
-        fig = px.bar(df, x=x, y=y, color=color_data, title=title)
-    elif config['type'] == 'Line':
-        x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
-        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-        color = config.get('color')
-        if color:
-            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
-        else:
-            color_data = None
-        fig = px.line(df, x=x, y=y, color=color_data, title=title)
-    elif config['type'] == 'Scatter':
-        x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
-        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-        color = config.get('color')
-        if color:
-            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) or not pd.api.types.is_numeric_dtype(df[color]) else df[color]
-        else:
-            color_data = None
-        fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
-    elif config['type'] == 'Histogram':
-        col = df[config['column']]
-        if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
-            col = col.astype(float)
-        else:
-            col = col.astype(str)
-        fig = px.histogram(df, x=col, title=title)
-    elif config['type'] == 'Box':
-        col = df[config['column']]
-        if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
-            col = col.astype(float)
-        else:
-            col = col.astype(str)
-        fig = px.box(df, y=col, title=title)
-    elif config['type'] == 'Pie':
-        value_counts = df[config['column']].value_counts().head(10)
-        fig = px.pie(values=value_counts.values.astype(float), names=value_counts.index.astype(str), title=title)
-    elif config['type'] == 'Heatmap':
-        if config['columns']:
-            corr_matrix = df[config['columns']].corr()
-            fig = px.imshow(corr_matrix.astype(float), title=title)
-        else:
-            st.warning("No numeric columns available for heatmap")
-            return
+    try:
+        if config['type'] == 'Bar':
+            # Ensure x and y are serializable
+            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.bar(df, x=x, y=y, color=color_data, title=title)
+        elif config['type'] == 'Line':
+            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.line(df, x=x, y=y, color=color_data, title=title)
+        elif config['type'] == 'Scatter':
+            x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
+            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+            color = config.get('color')
+            if color:
+                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) or not pd.api.types.is_numeric_dtype(df[color]) else df[color]
+            else:
+                color_data = None
+            fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
+        elif config['type'] == 'Histogram':
+            col = df[config['column']]
+            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+                col = col.astype(float)
+            else:
+                col = col.astype(str)
+            fig = px.histogram(df, x=col, title=title)
+        elif config['type'] == 'Box':
+            col = df[config['column']]
+            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+                col = col.astype(float)
+            else:
+                col = col.astype(str)
+            fig = px.box(df, y=col, title=title)
+        elif config['type'] == 'Pie':
+            value_counts = df[config['column']].value_counts().head(10)
+            fig = px.pie(values=value_counts.values.astype(float), names=value_counts.index.astype(str), title=title)
+        elif config['type'] == 'Heatmap':
+            if config['columns']:
+                corr_matrix = df[config['columns']].corr()
+                fig = px.imshow(corr_matrix.astype(float), title=title)
+            else:
+                st.warning("No numeric columns available for heatmap")
+                return
 
-    st.plotly_chart(fig, use_container_width=True)
-except Exception as e:
-    st.error(f"Error generating chart: {str(e)}")
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error generating chart: {str(e)}")
 
 # Tool Implementation
 
@@ -256,7 +256,7 @@ def execute_python_code(code, df):
         st.session_state.python_output = f"Error: {str(e)}"
 # Tool Implementation
 
-if selected_tool == "📤 Data Upload": # Keep this as the first tool
+if selected_tool == "📤 Data Upload":
     st.markdown('<h2 class="tool-header">📤 Data Upload & Preview</h2>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([2, 1])
@@ -281,7 +281,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                     
                     # Download processed data
                     st.html(
- create_download_link(df, f"processed_{uploaded_file.name}")
+                        create_download_link(df, f"processed_{uploaded_file.name}")
                     )
     
     with col2:

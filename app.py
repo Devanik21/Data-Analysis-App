@@ -37,26 +37,46 @@ st.set_page_config(
 # Custom CSS for better styling
 st.markdown("""
 <style>
+    /* General App Styling */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f6f8; /* Light background for the main area */
+    }
     .main-header {
         font-size: 3rem;
-        color: #1f77b4;
+        color: #1a5276; /* Darker, more professional blue */
         text-align: center;
         margin-bottom: 2rem;
         font-weight: bold;
+        text-shadow: 2px 2px 4px #cccccc;
     }
     .tool-header {
         font-size: 1.5rem;
-        color: #ff7f0e;
+        color: #c0392b; /* Professional red for emphasis */
         margin: 1rem 0;
-        border-bottom: 2px solid #ff7f0e;
+        border-bottom: 3px solid #c0392b;
         padding-bottom: 0.5rem;
+        font-weight: 600;
     }
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #ffffff; /* White cards for metrics */
         padding: 1rem;
         border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
+        border-left: 5px solid #1a5276; /* Accent border */
         margin: 0.5rem 0;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease-in-out;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    .stButton>button {
+        border-radius: 20px;
+        padding: 10px 20px;
+        font-weight: bold;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .stAlert {
         margin: 1rem 0;
@@ -71,6 +91,8 @@ if 'sql_history' not in st.session_state:
     st.session_state.sql_history = []
 if 'python_history' not in st.session_state:
     st.session_state.python_history = []
+if 'current_query' not in st.session_state: # For SQL Query tool
+    st.session_state.current_query = 'SELECT * FROM data LIMIT 10;'
 
 # Main Title
 st.markdown('<h1 class="main-header">🔬 Advanced Data Analysis Suite</h1>', unsafe_allow_html=True)
@@ -156,63 +178,63 @@ def advanced_outlier_detection(df, column):
 
 def generate_chart(df, config, title):
     """Generate chart based on configuration"""
-    try:
-        if config['type'] == 'Bar':
-            # Ensure x and y are serializable
-            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
-            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-            color = config.get('color')
-            if color:
-                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
-            else:
-                color_data = None
-            fig = px.bar(df, x=x, y=y, color=color_data, title=title)
-        elif config['type'] == 'Line':
-            x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
-            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-            color = config.get('color')
-            if color:
-                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
-            else:
-                color_data = None
-            fig = px.line(df, x=x, y=y, color=color_data, title=title)
-        elif config['type'] == 'Scatter':
-            x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
-            y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
-            color = config.get('color')
-            if color:
-                color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) or not pd.api.types.is_numeric_dtype(df[color]) else df[color]
-            else:
-                color_data = None
-            fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
-        elif config['type'] == 'Histogram':
-            col = df[config['column']]
-            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
-                col = col.astype(float)
-            else:
-                col = col.astype(str)
-            fig = px.histogram(df, x=col, title=title)
-        elif config['type'] == 'Box':
-            col = df[config['column']]
-            if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
-                col = col.astype(float)
-            else:
-                col = col.astype(str)
-            fig = px.box(df, y=col, title=title)
-        elif config['type'] == 'Pie':
-            value_counts = df[config['column']].value_counts().head(10)
-            fig = px.pie(values=value_counts.values.astype(float), names=value_counts.index.astype(str), title=title)
-        elif config['type'] == 'Heatmap':
-            if config['columns']:
-                corr_matrix = df[config['columns']].corr()
-                fig = px.imshow(corr_matrix.astype(float), title=title)
-            else:
-                st.warning("No numeric columns available for heatmap")
-                return
+try:
+    if config['type'] == 'Bar':
+        # Ensure x and y are serializable
+        x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+        color = config.get('color')
+        if color:
+            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+        else:
+            color_data = None
+        fig = px.bar(df, x=x, y=y, color=color_data, title=title)
+    elif config['type'] == 'Line':
+        x = df[config['x']].astype(str) if pd.api.types.is_object_dtype(df[config['x']]) else df[config['x']]
+        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+        color = config.get('color')
+        if color:
+            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) else df[color]
+        else:
+            color_data = None
+        fig = px.line(df, x=x, y=y, color=color_data, title=title)
+    elif config['type'] == 'Scatter':
+        x = df[config['x']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['x']]) else df[config['x']]
+        y = df[config['y']].astype(float) if not pd.api.types.is_numeric_dtype(df[config['y']]) else df[config['y']]
+        color = config.get('color')
+        if color:
+            color_data = df[color].astype(str) if pd.api.types.is_object_dtype(df[color]) or not pd.api.types.is_numeric_dtype(df[color]) else df[color]
+        else:
+            color_data = None
+        fig = px.scatter(df, x=x, y=y, color=color_data, title=title)
+    elif config['type'] == 'Histogram':
+        col = df[config['column']]
+        if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+            col = col.astype(float)
+        else:
+            col = col.astype(str)
+        fig = px.histogram(df, x=col, title=title)
+    elif config['type'] == 'Box':
+        col = df[config['column']]
+        if pd.api.types.is_integer_dtype(col) or pd.api.types.is_float_dtype(col):
+            col = col.astype(float)
+        else:
+            col = col.astype(str)
+        fig = px.box(df, y=col, title=title)
+    elif config['type'] == 'Pie':
+        value_counts = df[config['column']].value_counts().head(10)
+        fig = px.pie(values=value_counts.values.astype(float), names=value_counts.index.astype(str), title=title)
+    elif config['type'] == 'Heatmap':
+        if config['columns']:
+            corr_matrix = df[config['columns']].corr()
+            fig = px.imshow(corr_matrix.astype(float), title=title)
+        else:
+            st.warning("No numeric columns available for heatmap")
+            return
 
-        st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"Error generating chart: {str(e)}")
+    st.plotly_chart(fig, use_container_width=True)
+except Exception as e:
+    st.error(f"Error generating chart: {str(e)}")
 
 # Tool Implementation
 
@@ -256,7 +278,7 @@ def execute_python_code(code, df):
         st.session_state.python_output = f"Error: {str(e)}"
 # Tool Implementation
 
-if selected_tool == "📤 Data Upload":
+if selected_tool == "📤 Data Upload": # Keep this as the first tool
     st.markdown('<h2 class="tool-header">📤 Data Upload & Preview</h2>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([2, 1])
@@ -281,7 +303,7 @@ if selected_tool == "📤 Data Upload":
                     
                     # Download processed data
                     st.html(
-                        create_download_link(df, f"processed_{uploaded_file.name}")
+ create_download_link(df, f"processed_{uploaded_file.name}")
                     )
     
     with col2:
@@ -597,8 +619,11 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             "📊 Missing Value Analysis",
             "🏷️ Categorical Analysis",
             "⏰ Time Series Analysis",
-            "🔢 Statistical Summary", # Keep this one
-            "🧬 Multivariate Analysis", # Add new option
+            "🔢 Statistical Summary & Tests",
+            "⚙️ Dimensionality Reduction",
+            "🧩 Clustering Insights",
+            "📝 Text Analysis Utilities",
+            "🌍 Geospatial Analysis (Basic)",
             "📋 Data Quality Report",
             "🧮 Feature Engineering"
         ]
@@ -606,6 +631,10 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
         selected_eda = st.selectbox("Select EDA Tool", eda_tools)
         
         if selected_eda == "🔍 Data Overview":
+            # --- Data Overview ---
+            st.markdown("### 📜 Dataset Overview & Initial Checks")
+            st.markdown("Basic information about the shape, data types, and memory usage of your dataset.")
+
             col1, col2 = st.columns(2)
             
             with col1:
@@ -635,6 +664,9 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 st.plotly_chart(fig, use_container_width=True)
         
         elif selected_eda == "📈 Distribution Analysis":
+            st.markdown("### 📊 Distribution Analysis of Numeric Features")
+            st.markdown("Explore the distribution, central tendency, and spread of your numeric columns. Includes histograms, box plots, and normality tests.")
+
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             if not numeric_cols:
                 st.warning("No numeric columns found!")
@@ -645,28 +677,58 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 
                 with col1:
                     # Histogram
-                    fig = px.histogram(df, x=selected_col, nbins=50, title=f"Distribution of {selected_col}")
+                    fig = px.histogram(df, x=selected_col, nbins=50, title=f"Distribution of {selected_col}", marginal="box", opacity=0.8)
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
                     # Box plot
-                    fig = px.box(df, y=selected_col, title=f"Box Plot of {selected_col}")
+                    fig = px.box(df, y=selected_col, title=f"Box Plot of {selected_col}", points="all")
                     st.plotly_chart(fig, use_container_width=True)
                 
                 # Statistical tests
                 st.subheader("📊 Statistical Tests")
                 col_data = df[selected_col].dropna()
-                
-                # Normality test
-                shapiro_stat, shapiro_p = stats.shapiro(col_data.sample(min(5000, len(col_data))))
-                
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.metric("Skewness", f"{stats.skew(col_data):.3f}")
-                with col_b:
-                    st.metric("Kurtosis", f"{stats.kurtosis(col_data):.3f}")
-                with col_c:
-                    st.metric("Shapiro p-value", f"{shapiro_p:.6f}")
+                if len(col_data) > 1:
+                    col_a, col_b, col_c, col_d = st.columns(4)
+                    with col_a:
+                        st.metric("Skewness", f"{stats.skew(col_data):.3f}")
+                    with col_b:
+                        st.metric("Kurtosis", f"{stats.kurtosis(col_data):.3f}")
+                    
+                    if len(col_data) >= 3: # Shapiro-Wilk needs at least 3 samples
+                        shapiro_stat, shapiro_p = stats.shapiro(col_data.sample(min(5000, len(col_data))))
+                        with col_c:
+                            st.metric("Shapiro-Wilk (p)", f"{shapiro_p:.4f}")
+                            if shapiro_p > 0.05:
+                                st.caption("Likely Gaussian")
+                            else:
+                                st.caption("Likely Non-Gaussian")
+                    else:
+                        with col_c:
+                            st.info("Shapiro-Wilk: Needs >2 samples.")
+
+                    if len(col_data) >= 20: # D'Agostino's K^2 test needs at least 20 samples
+                        k2_stat, k2_p = stats.normaltest(col_data)
+                        with col_d:
+                            st.metric("D'Agostino K² (p)", f"{k2_p:.4f}")
+                            if k2_p > 0.05:
+                                st.caption("Likely Gaussian")
+                            else:
+                                st.caption("Likely Non-Gaussian")
+                    else:
+                        with col_d:
+                            st.info("D'Agostino K²: Needs >19 samples.")
+
+                    st.markdown("#### Quantile-Quantile (QQ) Plot")
+                    fig_qq = go.Figure()
+                    qq_data = stats.probplot(col_data, dist="norm", plot=None) # Get data for plot
+                    fig_qq.add_trace(go.Scatter(x=qq_data[0][0], y=qq_data[0][1], mode='markers', name='Ordered Values'))
+                    fig_qq.add_trace(go.Scatter(x=qq_data[0][0], y=qq_data[1][0]*qq_data[0][0] + qq_data[1][1], mode='lines', name='Fit Line', line=dict(color='red')))
+                    fig_qq.update_layout(title=f'QQ Plot for {selected_col}', xaxis_title='Theoretical Quantiles', yaxis_title='Sample Quantiles')
+                    st.plotly_chart(fig_qq, use_container_width=True)
+
+                else:
+                    st.warning(f"Not enough data in '{selected_col}' for detailed statistical tests.")
         
         elif selected_eda == "🔗 Correlation Analysis":
             numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -678,7 +740,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 # Correlation heatmap
                 fig = px.imshow(corr_matrix, 
                               title="Correlation Matrix",
-                              color_continuous_scale="RdBu",
+                              color_continuous_scale="RdBu_r", # Reversed RdBu for intuitive positive/negative
                               aspect="auto")
                 st.plotly_chart(fig, use_container_width=True)
                 
@@ -700,6 +762,20 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                     st.dataframe(strong_corr_df)
                 else:
                     st.info("No strong correlations found.")
+
+                st.markdown("#### Pairwise Scatter Plots for Highly Correlated Variables")
+                if strong_corr:
+                    num_pair_plots = st.slider("Number of Pair Plots to Show", 1, min(5, len(strong_corr)), min(3, len(strong_corr)), key="corr_pair_plots")
+                    for i in range(num_pair_plots):
+                        var1 = strong_corr[i]['Variable 1']
+                        var2 = strong_corr[i]['Variable 2']
+                        fig_pair_scatter = px.scatter(df, x=var1, y=var2, title=f"{var1} vs {var2} (Correlation: {strong_corr[i]['Correlation']:.2f})",
+                                                      marginal_x="histogram", marginal_y="histogram", trendline="ols")
+                        st.plotly_chart(fig_pair_scatter, use_container_width=True)
+                else:
+                    st.info("No strong correlations to generate pair plots.")
+
+
         
         elif selected_eda == "🎯 Outlier Detection":
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -710,12 +786,12 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 
                 outlier_methods = advanced_outlier_detection(df, selected_col)
                 
-                col1, col2 = st.columns(2)
+                col1, col2 = st.columns([1,2]) # Adjust column ratio
                 
                 with col1:
                     st.subheader("🔍 Outlier Detection Results")
                     for method, count in outlier_methods.items():
-                        st.metric(f"{method} Outliers", count)
+                        st.metric(f"{method} Outliers", count, help=f"Number of outliers detected by {method} method.")
                 
                 with col2:
                     # Scatter plot with outliers highlighted
@@ -746,6 +822,20 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                     
                     fig.update_layout(title=f"Outlier Detection: {selected_col}")
                     st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("#### Local Outlier Factor (LOF) - Conceptual")
+                st.info("LOF identifies outliers by measuring the local density deviation of a given data point with respect to its neighbors. Implementation requires careful parameter tuning (n_neighbors, contamination).")
+                if len(df[[selected_col]].dropna()) > 5: # LOF needs some data
+                    from sklearn.neighbors import LocalOutlierFactor
+                    lof = LocalOutlierFactor(n_neighbors=min(20, len(df[[selected_col]].dropna())-1), contamination='auto')
+                    lof_labels = lof.fit_predict(df[[selected_col]].dropna())
+                    lof_outliers = sum(lof_labels == -1)
+                    st.metric("LOF Outliers (Conceptual)", lof_outliers, help="Number of outliers detected by LOF (parameters not tuned).")
+                else:
+                    st.warning("Not enough data points for LOF.")
+
+
+
         
         elif selected_eda == "📊 Missing Value Analysis":
             missing_data = df.isnull().sum()
@@ -779,6 +869,15 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                               title="Missing Value Pattern",
                               color_continuous_scale="Reds")
                 st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("#### Missingness Correlation Heatmap (Conceptual)")
+            st.info("This heatmap would show if the absence of a value in one column is correlated with the absence of values in other columns. Requires `missingno` library or custom implementation.")
+            if df.isnull().sum().sum() > 0 and len(df.columns[df.isnull().any()]) > 1:
+                # Conceptual: if missingno was installed:
+                # import missingno as msno
+                # fig_missing_corr, ax = plt.subplots()
+                # msno.matrix(df[df.columns[df.isnull().any()]], ax=ax, sparkline=False) # Using matrix as a proxy for correlation heatmap concept
+                st.warning("`missingno` library is not directly used here to avoid heavy dependencies. A full missingness correlation matrix would visualize these relationships.")
         
         elif selected_eda == "🏷️ Categorical Analysis":
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
@@ -804,6 +903,22 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                     fig = px.bar(x=value_counts.head(10).index, 
                                y=value_counts.head(10).values,
                                title=f"Top 10 Values in {selected_col}")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                st.markdown("#### Cross-Tabulation & Chi-squared Test")
+                if len(categorical_cols) >= 2:
+                    cat_col_1 = st.selectbox("Select first categorical column for Chi² test", categorical_cols, key="cat_chi2_1")
+                    cat_col_2 = st.selectbox("Select second categorical column for Chi² test", [c for c in categorical_cols if c != cat_col_1], key="cat_chi2_2")
+                    if cat_col_1 and cat_col_2:
+                        contingency_table = pd.crosstab(df[cat_col_1], df[cat_col_2])
+                        st.write("Contingency Table:")
+                        st.dataframe(contingency_table)
+                        chi2, p, dof, expected = stats.chi2_contingency(contingency_table)
+                        st.metric("Chi-squared Statistic", f"{chi2:.2f}")
+                        st.metric("P-value", f"{p:.3f}")
+                        st.caption("Low p-value (<0.05) suggests a significant association between the two variables.")
+                else:
+                    st.info("Need at least two categorical columns for Chi-squared test.")
                     st.plotly_chart(fig, use_container_width=True)
         
         elif selected_eda == "⏰ Time Series Analysis":
@@ -844,10 +959,31 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         time_range = df[time_col].max() - df[time_col].min()
                         st.metric("Time Range", str(time_range))
                         st.metric("Data Points", len(df))
-                        st.metric("Average Value", f"{df[value_col].mean():.2f}")
+                        st.metric("Average Value", f"{df[value_col].mean():.2f}")                    
 
-        elif selected_eda == "🔢 Statistical Summary":
-            st.subheader("🔢 Detailed Statistical Summary")
+                    st.markdown("#### Time Series Decomposition (Conceptual)")
+                    st.info("Decomposes the time series into trend, seasonality, and residuals. Requires `statsmodels`.")
+                    if len(df[value_col].dropna()) >= 24: # Need enough data for decomposition
+                        # from statsmodels.tsa.seasonal import seasonal_decompose
+                        # result_decompose = seasonal_decompose(df[value_col].dropna(), model='additive', period=12) # Assuming monthly data for period=12
+                        # fig_decompose = result_decompose.plot()
+                        # st.pyplot(fig_decompose)
+                        st.warning("`statsmodels` decomposition plot is conceptual here. Ensure the library is installed and data has appropriate frequency.")
+                    else:
+                        st.warning("Not enough data points for time series decomposition.")
+
+                    st.markdown("#### Autocorrelation (ACF) and Partial Autocorrelation (PACF) Plots (Conceptual)")
+                    st.info("These plots help identify seasonality and lag effects in time series data. Requires `statsmodels`.")
+                    if len(df[value_col].dropna()) >= 20:
+                        # from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+                        # fig_acf, ax_acf = plt.subplots(); plot_acf(df[value_col].dropna(), ax=ax_acf, lags=min(20, len(df[value_col].dropna())//2 -1))
+                        # st.pyplot(fig_acf)
+                        # fig_pacf, ax_pacf = plt.subplots(); plot_pacf(df[value_col].dropna(), ax=ax_pacf, lags=min(20, len(df[value_col].dropna())//2 -1))
+                        # st.pyplot(fig_pacf)
+                        st.warning("`statsmodels` ACF/PACF plots are conceptual. Ensure library is installed.")
+
+        elif selected_eda == "🔢 Statistical Summary & Tests":
+            st.subheader("🔢 Detailed Statistical Summary & Hypothesis Tests")
             
             st.markdown("#### Overall Descriptive Statistics (Numeric Columns)")
             st.dataframe(df.describe(include=[np.number]))
@@ -872,8 +1008,45 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         else:
                             st.write(f"**Mode:** {modes}")
 
-        elif selected_eda == "🧬 Multivariate Analysis":
-            st.subheader("🧬 Multivariate Analysis")
+            st.markdown("#### Hypothesis Testing Utilities")
+            numeric_cols_test = df.select_dtypes(include=np.number).columns.tolist()
+            if len(numeric_cols_test) >= 1:
+                st.markdown("##### One-Sample T-test")
+                col_ttest1 = st.selectbox("Select column for One-Sample T-test", numeric_cols_test, key="eda_ttest1_col")
+                pop_mean = st.number_input("Population Mean (μ₀)", value=0.0, key="eda_ttest1_popmean")
+                if st.button("Run One-Sample T-test", key="eda_run_ttest1"):
+                    stat, p_val = stats.ttest_1samp(df[col_ttest1].dropna(), pop_mean)
+                    st.write(f"T-statistic: {stat:.3f}, P-value: {p_val:.3f}")
+                    st.caption("Tests if the mean of a single sample is equal to a known population mean.")
+
+            if len(numeric_cols_test) >= 2:
+                st.markdown("##### Two-Sample T-test (Independent)")
+                col_ttest2_a = st.selectbox("Select first column for Two-Sample T-test", numeric_cols_test, key="eda_ttest2_col_a")
+                col_ttest2_b = st.selectbox("Select second column for Two-Sample T-test", [c for c in numeric_cols_test if c != col_ttest2_a], key="eda_ttest2_col_b")
+                if col_ttest2_a and col_ttest2_b and st.button("Run Two-Sample T-test", key="eda_run_ttest2"):
+                    stat, p_val = stats.ttest_ind(df[col_ttest2_a].dropna(), df[col_ttest2_b].dropna())
+                    st.write(f"T-statistic: {stat:.3f}, P-value: {p_val:.3f}")
+                    st.caption("Tests if the means of two independent samples are equal.")
+
+            if len(numeric_cols_test) >= 2 and len(categorical_cols) >=1 :
+                st.markdown("##### ANOVA (One-Way)")
+                anova_num_col = st.selectbox("Select numeric column for ANOVA", numeric_cols_test, key="eda_anova_num")
+                anova_cat_col = st.selectbox("Select categorical column for ANOVA groups", categorical_cols, key="eda_anova_cat")
+                if anova_num_col and anova_cat_col:
+                    groups = [df[anova_num_col][df[anova_cat_col] == cat].dropna() for cat in df[anova_cat_col].unique() if len(df[anova_num_col][df[anova_cat_col] == cat].dropna()) > 1]
+                    if len(groups) >= 2:
+                        if st.button("Run ANOVA", key="eda_run_anova"):
+                            f_stat, p_val = stats.f_oneway(*groups)
+                            st.write(f"F-statistic: {f_stat:.3f}, P-value: {p_val:.3f}")
+                            st.caption("Tests if the means of two or more groups are equal.")
+                    else:
+                        st.warning("Not enough groups with sufficient data for ANOVA.")
+            else:
+                st.info("ANOVA requires at least two numeric columns and one categorical column with multiple groups.")
+
+
+        elif selected_eda == "🧬 Multivariate Analysis": # This was the old name for the section
+            st.subheader("🧬 Advanced Multivariate Visualizations")
             numeric_cols_mv = df.select_dtypes(include=np.number).columns.tolist()
 
             if len(numeric_cols_mv) < 2:
@@ -922,6 +1095,80 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                                 st.plotly_chart(fig_3d, use_container_width=True)
                             except Exception as e:
                                 st.error(f"Error generating 3D scatter plot: {e}")
+                
+                st.markdown("---")
+                st.markdown("#### 📊 Parallel Coordinates Plot")
+                st.info("Visualizes multiple numeric variables, with each variable represented by a vertical axis. Each data point is a line connecting its values across these axes.")
+                if len(numeric_cols_mv) >= 3:
+                    parallel_cols = st.multiselect(
+                        "Select columns for Parallel Coordinates Plot (3-7 recommended)",
+                        numeric_cols_mv,
+                        default=numeric_cols_mv[:min(len(numeric_cols_mv), 5)],
+                        key="mv_parallel_cols"
+                    )
+                    parallel_color_col = st.selectbox("Color by (Categorical Column - Optional)", ['None'] + df.select_dtypes(include=['object', 'category']).columns.tolist(), key="mv_parallel_color")
+                    parallel_color_col = None if parallel_color_col == 'None' else parallel_color_col
+
+                    if parallel_cols and len(parallel_cols) >=2 and st.button("Generate Parallel Coordinates Plot", key="mv_generate_parallel"):
+                        with st.spinner("Generating Parallel Coordinates Plot..."):
+                            try:
+                                fig_parallel = px.parallel_coordinates(df, dimensions=parallel_cols, color=parallel_color_col, title="Parallel Coordinates Plot")
+                                st.plotly_chart(fig_parallel, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating parallel coordinates plot: {e}")
+                else:
+                    st.warning("Parallel Coordinates Plot requires at least 3 numeric columns.")
+
+        elif selected_eda == "⚙️ Dimensionality Reduction":
+            st.subheader("⚙️ Dimensionality Reduction Insights (PCA)")
+            numeric_cols_pca = df.select_dtypes(include=np.number).columns.tolist()
+            if len(numeric_cols_pca) < 2:
+                st.warning("PCA requires at least two numeric columns.")
+            else:
+                st.info("Principal Component Analysis (PCA) is performed on scaled numeric data.")
+                
+                # Prepare data for PCA
+                pca_df = df[numeric_cols_pca].dropna()
+                if pca_df.empty or len(pca_df) < 2:
+                     st.warning("Not enough data after dropping NaNs for PCA.")
+                else:
+                    scaler = StandardScaler()
+                    scaled_data = scaler.fit_transform(pca_df)
+                    
+                    n_components_pca = st.slider("Number of PCA Components to Analyze", 2, min(10, len(numeric_cols_pca)), min(5, len(numeric_cols_pca)), key="pca_n_components")
+                    pca = PCA(n_components=n_components_pca)
+                    pca.fit(scaled_data)
+
+                    st.markdown("#### Explained Variance")
+                    explained_variance_ratio = pca.explained_variance_ratio_
+                    cumulative_explained_variance = np.cumsum(explained_variance_ratio)
+
+                    fig_scree = go.Figure()
+                    fig_scree.add_trace(go.Bar(x=list(range(1, n_components_pca + 1)), y=explained_variance_ratio, name='Individual Explained Variance'))
+                    fig_scree.add_trace(go.Scatter(x=list(range(1, n_components_pca + 1)), y=cumulative_explained_variance, name='Cumulative Explained Variance', marker_color='red'))
+                    fig_scree.update_layout(title='Scree Plot & Cumulative Explained Variance', xaxis_title='Principal Component', yaxis_title='Explained Variance Ratio')
+                    st.plotly_chart(fig_scree, use_container_width=True)
+
+                    st.markdown("#### PCA Loadings (Conceptual)")
+                    st.info("Loadings show how much each original variable contributes to each principal component. A full loadings plot would be a heatmap or table.")
+                    if hasattr(pca, 'components_'):
+                        loadings_df = pd.DataFrame(pca.components_.T, columns=[f'PC{i+1}' for i in range(n_components_pca)], index=numeric_cols_pca)
+                        st.dataframe(loadings_df.head())
+
+                    st.markdown("#### PCA Projection (2D Scatter)")
+                    if n_components_pca >= 2:
+                        pca_2d = PCA(n_components=2)
+                        projected_data = pca_2d.fit_transform(scaled_data)
+                        pca_scatter_df = pd.DataFrame(projected_data, columns=['PC1', 'PC2'])
+                        
+                        pca_color_col = st.selectbox("Color PCA plot by (Categorical Column - Optional)", ['None'] + df.select_dtypes(include=['object', 'category']).columns.tolist(), key="pca_scatter_color")
+                        if pca_color_col != 'None' and pca_color_col in df.columns:
+                             # Align color column with pca_df (which had NaNs dropped)
+                            pca_scatter_df[pca_color_col] = df.loc[pca_df.index, pca_color_col].values
+                        
+                        fig_pca_scatter = px.scatter(pca_scatter_df, x='PC1', y='PC2', color=pca_color_col if pca_color_col != 'None' else None, title='2D PCA Projection')
+                        st.plotly_chart(fig_pca_scatter, use_container_width=True)
+
 
         elif selected_eda == "📋 Data Quality Report":
             st.subheader("📋 Data Quality Report")
@@ -931,6 +1178,55 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             st.markdown(f"**Total Missing Values:** {df.isnull().sum().sum()}")
             st.markdown(f"**Memory Usage:** {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
             # Further details can be linked from other EDA sections (Missing Values, Outliers)
+            
+            st.markdown("#### Data Type Consistency")
+            mixed_type_cols = []
+            for col in df.columns:
+                if df[col].apply(type).nunique() > 1:
+                    mixed_type_cols.append(col)
+            if mixed_type_cols:
+                st.warning(f"Columns with mixed data types found: {', '.join(mixed_type_cols)}. This can cause issues in analysis.")
+            else:
+                st.success("No columns with overtly mixed Python data types detected (Pandas dtypes are generally consistent).")
+
+            st.markdown("#### Cardinality of Categorical Features")
+            cat_cols_card = df.select_dtypes(include=['object', 'category']).columns
+            if not cat_cols_card.empty:
+                cardinality_data = []
+                for col in cat_cols_card:
+                    nunique = df[col].nunique()
+                    cardinality_data.append({'Column': col, 'Unique Values': nunique, 'Cardinality Ratio': nunique/len(df)})
+                cardinality_df = pd.DataFrame(cardinality_data).sort_values(by="Unique Values", ascending=False)
+                st.dataframe(cardinality_df)
+                high_cardinality_cols = cardinality_df[cardinality_df['Cardinality Ratio'] > 0.5]['Column'].tolist()
+                if high_cardinality_cols:
+                    st.warning(f"High cardinality categorical features: {', '.join(high_cardinality_cols)}. Consider encoding or feature engineering.")
+            else:
+                st.info("No categorical columns to analyze for cardinality.")
+
+        elif selected_eda == "🧩 Clustering Insights":
+            st.subheader("🧩 Unsupervised Clustering Insights (K-Means)")
+            numeric_cols_cluster = df.select_dtypes(include=np.number).columns.tolist()
+            if len(numeric_cols_cluster) < 2:
+                st.warning("Clustering requires at least two numeric columns.")
+            else:
+                cluster_df = df[numeric_cols_cluster].dropna()
+                if cluster_df.empty or len(cluster_df) < 5: # K-Means needs some data
+                    st.warning("Not enough data after dropping NaNs for clustering.")
+                else:
+                    scaler = StandardScaler()
+                    scaled_cluster_data = scaler.fit_transform(cluster_df)
+
+                    st.markdown("#### Elbow Method for Optimal K")
+                    inertia = []
+                    k_range = range(1, 11)
+                    for k_val in k_range:
+                        kmeans = KMeans(n_clusters=k_val, random_state=42, n_init='auto')
+                        kmeans.fit(scaled_cluster_data)
+                        inertia.append(kmeans.inertia_)
+                    fig_elbow = px.line(x=list(k_range), y=inertia, title="Elbow Method for K-Means", markers=True, labels={'x':'Number of Clusters (K)', 'y':'Inertia'})
+                    st.plotly_chart(fig_elbow, use_container_width=True)
+                    st.caption("Look for the 'elbow' point where adding more clusters doesn't significantly reduce inertia.")
 
         elif selected_eda == "🧮 Feature Engineering":
             st.subheader("🧮 Feature Engineering")
@@ -944,7 +1240,10 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                     "Label Encode Categorical",
                     "Scale Numeric (StandardScaler)",
                     "Bin Numeric Column",
-                    "Extract Date/Time Features"
+                    "Extract Date/Time Features",
+                    "Create Polynomial Features",
+                    "Create Interaction Features",
+                    "Log/Power Transformation"
                 ], key="fe_technique_select")
 
                 if fe_type == "One-Hot Encode Categorical":
@@ -1082,7 +1381,67 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                                     st.dataframe(df_processed[[col_to_extract] + [f"{col_to_extract}_{f.lower().replace(' ', '_')}" for f in features_to_extract]].head())
                                     st.session_state.df = df_processed # Update main DataFrame
                                 except Exception as e:
-                                    st.error(f"Error extracting datetime features: {str(e)}")
+                                    st.error(f"Error extracting datetime features: {str(e)}")                
+                
+                elif fe_type == "Create Polynomial Features":
+                    numeric_cols_poly = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if not numeric_cols_poly:
+                        st.warning("No numeric columns for Polynomial Features.")
+                    else:
+                        poly_cols = st.multiselect("Select numeric columns for Polynomial Features", numeric_cols_poly, key="fe_poly_cols")
+                        degree = st.slider("Polynomial Degree", 2, 4, 2, key="fe_poly_degree")
+                        interaction_only = st.checkbox("Interaction Terms Only?", value=False, key="fe_poly_interaction")
+                        include_bias = st.checkbox("Include Bias Term (intercept)?", value=False, key="fe_poly_bias")
+
+                        if st.button("Generate Polynomial Features", key="fe_execute_poly"):
+                            if not poly_cols:
+                                st.warning("Please select at least one column.")
+                            else:
+                                try:
+                                    from sklearn.preprocessing import PolynomialFeatures
+                                    poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
+                                    poly_features = poly.fit_transform(df[poly_cols])
+                                    poly_feature_names = poly.get_feature_names_out(poly_cols)
+                                    df_poly = pd.DataFrame(poly_features, columns=poly_feature_names, index=df.index)
+                                    
+                                    # Merge back, avoiding duplicate original columns if include_bias=False and interaction_only=False
+                                    df_processed = df.copy()
+                                    for col_name in poly_feature_names:
+                                        if col_name not in df_processed.columns: # Add only new features
+                                            df_processed[col_name] = df_poly[col_name]
+                                        elif col_name in poly_cols and (interaction_only or include_bias): # If original col is part of output and we want interactions/bias
+                                            df_processed[f"{col_name}_poly"] = df_poly[col_name] # rename to avoid clash if it's just the original
+
+                                    st.success(f"Generated {len(poly_feature_names)} polynomial features. Original columns selected: {len(poly_cols)}")
+                                    st.dataframe(df_processed.head())
+                                    st.session_state.df = df_processed
+                                except Exception as e:
+                                    st.error(f"Error generating polynomial features: {e}")
+                
+                elif fe_type == "Create Interaction Features":
+                    numeric_cols_interact = df.select_dtypes(include=[np.number]).columns.tolist()
+                    if len(numeric_cols_interact) < 2:
+                        st.warning("Need at least two numeric columns for Interaction Features.")
+                    else:
+                        interact_col1 = st.selectbox("Select first numeric column", numeric_cols_interact, key="fe_interact_col1")
+                        interact_col2 = st.selectbox("Select second numeric column", [c for c in numeric_cols_interact if c != interact_col1], key="fe_interact_col2")
+                        new_col_name_interact = st.text_input("New Interaction Column Name", value=f"{interact_col1}_x_{interact_col2}", key="fe_interact_new_name")
+                        if st.button("Create Interaction Feature", key="fe_execute_interact"):
+                            if interact_col1 and interact_col2 and new_col_name_interact:
+                                try:
+                                    df_processed = df.copy()
+                                    df_processed[new_col_name_interact] = df_processed[interact_col1] * df_processed[interact_col2]
+                                    st.success(f"Created interaction feature '{new_col_name_interact}'.")
+                                    st.dataframe(df_processed[[interact_col1, interact_col2, new_col_name_interact]].head())
+                                    st.session_state.df = df_processed
+                                except Exception as e:
+                                    st.error(f"Error creating interaction feature: {e}")
+                            else:
+                                st.warning("Please select two distinct columns and provide a new column name.")
+
+                # Placeholder for Text Analysis and Geospatial Analysis within EDA if relevant columns are detected
+                # These would require more specific libraries and checks (e.g., for text: nltk, spacy; for geo: geopandas, folium)
+
 
 elif selected_tool == "📈 Excel Query Tool":
     st.markdown('<h2 class="tool-header">📈 Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
@@ -2472,7 +2831,7 @@ elif selected_tool == "🌐 Web Scraping Tool":
             "Extract Text by Tag",
             "Extract by CSS Selector", 
             "Extract Table Data",
-            "Extract Links",
+            "Extract All Links",
             "Extract Images",
             "Custom BeautifulSoup"
         ])
@@ -2489,7 +2848,7 @@ elif selected_tool == "🌐 Web Scraping Tool":
         elif method == "Extract Table Data":
             table_index = st.number_input("Table Index (0-based):", min_value=0, value=0)
             
-        elif method == "Extract Links":
+        elif method == "Extract All Links":
             filter_text = st.text_input("Filter links containing text (optional):")
             
         elif method == "Extract Images":
@@ -2597,7 +2956,7 @@ def scrape_website(url, method, params, export_format):
                     st.error(f"Table {table_index} not found!")
                     return
             
-            elif method == "Extract Links":
+            elif method == "Extract All Links":
                 filter_text = params.get('filter_text', '')
                 links = soup.find_all('a', href=True)
                 
@@ -2675,3 +3034,7 @@ def scrape_website(url, method, params, export_format):
                         )
     except Exception as e:
         st.error(f"Web scraping error: {str(e)}")
+
+# Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction
+if 'df' in st.session_state and st.session_state.df is not None and 'df' not in locals():
+    df = st.session_state.df

@@ -27,6 +27,7 @@ from sqlalchemy import create_engine, text
 import time
 import re
 import json
+import pickle
 from typing import Optional, Dict, Any, List
 import google.generativeai as genai
 
@@ -120,6 +121,48 @@ if api_key:
         st.sidebar.success("Gemini model configured!")
     except Exception as e:
         st.sidebar.error(f"Invalid API Key: {e}")
+
+# --- Session Management ---
+st.sidebar.title("💾 Session Management")
+
+# Create a dictionary of the current session state to save
+# We exclude non-serializable or re-initializable objects like the gemini model
+# Also exclude temporary results that can be regenerated
+state_to_save = {
+    key: value for key, value in st.session_state.items() 
+    if key not in ['gemini_model', 'python_plots', 'python_plotly_figs', 'sql_result']
+}
+
+# Serialize the state
+try:
+    # Use a higher protocol for efficiency with large dataframes
+    state_bytes = pickle.dumps(state_to_save, protocol=pickle.HIGHEST_PROTOCOL)
+    st.sidebar.download_button(
+        label="📥 Save Session",
+        data=state_bytes,
+        file_name=f"data_suite_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl",
+        mime="application/octet-stream",
+        help="Save your current data, history, and code to a file."
+    )
+except Exception as e:
+    st.sidebar.error(f"Error preparing session for download: {e}")
+
+# Load session state
+loaded_session_file = st.sidebar.file_uploader(
+    "📤 Load Session", 
+    type=['pkl'], 
+    help="Load a previously saved session file (.pkl)."
+)
+
+if loaded_session_file is not None:
+    try:
+        loaded_state = pickle.load(loaded_session_file)
+        for key, value in loaded_state.items():
+            st.session_state[key] = value
+        st.sidebar.success("Session loaded successfully! Refreshing app...")
+        st.experimental_rerun()
+    except Exception as e:
+        st.sidebar.error(f"Error loading session file: {e}. The file may be corrupted or from an incompatible version.")
 
 # Sidebar for navigation
 st.sidebar.title("🧭 Navigation")

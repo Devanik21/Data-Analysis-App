@@ -7,22 +7,27 @@ from plotly.subplots import make_subplots
 import seaborn as sns
 import matplotlib.pyplot as plt
 import sqlite3
+import duckdb
 import requests
 from bs4 import BeautifulSoup
 import io
 import base64
 from datetime import datetime
 import warnings
+import sys
 import scipy.stats as stats
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.ensemble import IsolationForest
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import openpyxl
 from sqlalchemy import create_engine, text
 import time
 import re
 import json
+from typing import Optional, Dict, Any, List
 import google.generativeai as genai
 
 warnings.filterwarnings('ignore')
@@ -98,6 +103,8 @@ if 'gemini_model' not in st.session_state:
     st.session_state.gemini_model = None
 if 'python_plots' not in st.session_state:
     st.session_state.python_plots = []
+if 'python_plotly_figs' not in st.session_state:
+    st.session_state.python_plotly_figs = []
 
 # Main Title
 st.markdown('<h1 class="main-header">🔬 Advanced Data Analysis Suite</h1>', unsafe_allow_html=True)
@@ -132,7 +139,7 @@ selected_tool = st.sidebar.selectbox("Select Analysis Tool", tools)
 
 # Helper Functions
 @st.cache_data
-def load_data(file):
+def load_data(file: Any) -> Optional[pd.DataFrame]:
     """Load data from various file formats"""
     try:
         if file.name.endswith('.csv'):
@@ -151,26 +158,25 @@ def load_data(file):
         st.error(f"Error loading file: {str(e)}")
         return None
 
-def create_download_link(df, filename="data.csv"):
+def create_download_link(df: pd.DataFrame, filename: str = "data.csv") -> str:
     """Create download link for dataframe"""
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">Download {filename}</a>'
     return href
 
-def execute_sql_query(df, query):
-    """Execute SQL query on dataframe"""
+def execute_sql_query(df: pd.DataFrame, query: str) -> tuple[Optional[pd.DataFrame], Optional[str]]:
+    """Execute SQL query on dataframe using DuckDB for high performance."""
     try:
-        # Create in-memory SQLite database
-        conn = sqlite3.connect(':memory:')
-        df.to_sql('data', conn, index=False, if_exists='replace')
-        result = pd.read_sql_query(query, conn)
+        conn = duckdb.connect(database=':memory:')
+        conn.register('data', df)
+        result = conn.execute(query).fetchdf()
         conn.close()
         return result, None
     except Exception as e:
         return None, str(e)
 
-def advanced_outlier_detection(df, column):
+def advanced_outlier_detection(df: pd.DataFrame, column: str) -> dict:
     """Advanced outlier detection using multiple methods"""
     methods = {}
     
@@ -194,7 +200,7 @@ def advanced_outlier_detection(df, column):
     
     return methods
 
-def generate_chart(df, config, title):
+def generate_chart(df: pd.DataFrame, config: dict, title: str) -> None:
     """Generate chart based on configuration"""
     try:
         if config['type'] == 'Bar':
@@ -253,7 +259,7 @@ def generate_chart(df, config, title):
     except Exception as e:
         st.error(f"Error generating chart: {str(e)}")
 
-def generate_gemini_content(prompt_text):
+def generate_gemini_content(prompt_text: str) -> Optional[str]:
     """Generates content using the Gemini model."""
     if not st.session_state.gemini_model:
         st.error("Gemini model not configured. Please enter your API key in the sidebar.")
@@ -266,14 +272,19 @@ def generate_gemini_content(prompt_text):
         st.error(f"An error occurred with the Gemini API: {e}")
         return None
 
-def execute_python_code(code, df):
-    """Execute Python code safely and capture output and plots."""
+def execute_python_code(code: str, df: pd.DataFrame) -> None:
+    """
+    Execute Python code safely and capture output, matplotlib plots, and plotly figures.
+    The user's code can create a variable named 'fig' (for a single plot) or
+    'figs' (for a list of plots) to have them displayed.
+    """
     output_buffer = io.StringIO()
     original_stdout = sys.stdout
     sys.stdout = output_buffer
 
     # Clear previous plots from session state
     st.session_state.python_plots = []
+    st.session_state.python_plotly_figs = []
 
     try:
         # Create a safe execution environment
@@ -290,7 +301,8 @@ def execute_python_code(code, df):
             'PCA': PCA,
             'KMeans': KMeans,
             'IsolationForest': IsolationForest,
-            'LabelEncoder': LabelEncoder
+            'LabelEncoder': LabelEncoder,
+            'st': st # Allow users to use some streamlit functions if they want
         }
 
         # Execute code
@@ -301,6 +313,16 @@ def execute_python_code(code, df):
         for i in fig_nums:
             fig = plt.figure(i)
             st.session_state.python_plots.append(fig)
+
+        # Capture any plotly figure object(s) created by the user
+        if 'fig' in exec_globals:
+            if isinstance(exec_globals['fig'], go.Figure):
+                st.session_state.python_plotly_figs.append(exec_globals['fig'])
+        if 'figs' in exec_globals:
+            if isinstance(exec_globals['figs'], list):
+                for f in exec_globals['figs']:
+                    if isinstance(f, go.Figure):
+                        st.session_state.python_plotly_figs.append(f)
 
     except Exception as e:
         st.session_state.python_output = f"Execution Error: {str(e)}"
@@ -652,6 +674,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             "📊 Missing Value Analysis",
             "🏷️ Categorical Analysis",
             "⏰ Time Series Analysis",
+            "🧬 Multivariate Analysis",
             "🔢 Statistical Summary & Tests",
             "⚙️ Dimensionality Reduction",
             "🧩 Clustering Insights",
@@ -902,15 +925,6 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                               title="Missing Value Pattern",
                               color_continuous_scale="Reds")
                 st.plotly_chart(fig, use_container_width=True)
-            
-            st.markdown("#### Missingness Correlation Heatmap (Conceptual)")
-            st.info("This heatmap would show if the absence of a value in one column is correlated with the absence of values in other columns. Requires `missingno` library or custom implementation.")
-            if df.isnull().sum().sum() > 0 and len(df.columns[df.isnull().any()]) > 1:
-                # Conceptual: if missingno was installed:
-                # import missingno as msno
-                # fig_missing_corr, ax = plt.subplots()
-                # msno.matrix(df[df.columns[df.isnull().any()]], ax=ax, sparkline=False) # Using matrix as a proxy for correlation heatmap concept
-                st.warning("`missingno` library is not directly used here to avoid heavy dependencies. A full missingness correlation matrix would visualize these relationships.")
         
         elif selected_eda == "🏷️ Categorical Analysis":
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
@@ -994,26 +1008,46 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         st.metric("Data Points", len(df))
                         st.metric("Average Value", f"{df[value_col].mean():.2f}")                    
 
-                    st.markdown("#### Time Series Decomposition (Conceptual)")
-                    st.info("Decomposes the time series into trend, seasonality, and residuals. Requires `statsmodels`.")
-                    if len(df[value_col].dropna()) >= 24: # Need enough data for decomposition
-                        # from statsmodels.tsa.seasonal import seasonal_decompose
-                        # result_decompose = seasonal_decompose(df[value_col].dropna(), model='additive', period=12) # Assuming monthly data for period=12
-                        # fig_decompose = result_decompose.plot()
-                        # st.pyplot(fig_decompose)
-                        st.warning("`statsmodels` decomposition plot is conceptual here. Ensure the library is installed and data has appropriate frequency.")
+                    st.markdown("#### Time Series Decomposition")
+                    st.info("Decomposes the time series into trend, seasonality, and residuals using `statsmodels`.")
+                    decomp_period = st.number_input("Seasonality Period (e.g., 12 for monthly, 7 for daily)", min_value=2, value=12, step=1)
+                    if len(df[value_col].dropna()) >= 2 * decomp_period:
+                        try:
+                            # Ensure the time column is the index for decomposition
+                            ts_data = df.set_index(time_col)[value_col].dropna()
+                            result_decompose = seasonal_decompose(ts_data, model='additive', period=decomp_period)
+                            
+                            fig_decompose = make_subplots(rows=4, cols=1, shared_xaxes=True,
+                                                          subplot_titles=("Observed", "Trend", "Seasonal", "Residual"))
+                            fig_decompose.add_trace(go.Scatter(x=result_decompose.observed.index, y=result_decompose.observed, mode='lines', name='Observed'), row=1, col=1)
+                            fig_decompose.add_trace(go.Scatter(x=result_decompose.trend.index, y=result_decompose.trend, mode='lines', name='Trend'), row=2, col=1)
+                            fig_decompose.add_trace(go.Scatter(x=result_decompose.seasonal.index, y=result_decompose.seasonal, mode='lines', name='Seasonal'), row=3, col=1)
+                            fig_decompose.add_trace(go.Scatter(x=result_decompose.resid.index, y=result_decompose.resid, mode='markers', name='Residual'), row=4, col=1)
+                            fig_decompose.update_layout(height=600, title_text="Time Series Decomposition")
+                            st.plotly_chart(fig_decompose, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Could not perform decomposition: {e}")
                     else:
-                        st.warning("Not enough data points for time series decomposition.")
+                        st.warning(f"Not enough data points for decomposition with period {decomp_period}. Need at least {2 * decomp_period} points.")
 
-                    st.markdown("#### Autocorrelation (ACF) and Partial Autocorrelation (PACF) Plots (Conceptual)")
-                    st.info("These plots help identify seasonality and lag effects in time series data. Requires `statsmodels`.")
-                    if len(df[value_col].dropna()) >= 20:
-                        # from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-                        # fig_acf, ax_acf = plt.subplots(); plot_acf(df[value_col].dropna(), ax=ax_acf, lags=min(20, len(df[value_col].dropna())//2 -1))
-                        # st.pyplot(fig_acf)
-                        # fig_pacf, ax_pacf = plt.subplots(); plot_pacf(df[value_col].dropna(), ax=ax_pacf, lags=min(20, len(df[value_col].dropna())//2 -1))
-                        # st.pyplot(fig_pacf)
-                        st.warning("`statsmodels` ACF/PACF plots are conceptual. Ensure library is installed.")
+                    st.markdown("#### Autocorrelation (ACF) and Partial Autocorrelation (PACF) Plots")
+                    st.info("These plots from `statsmodels` help identify seasonality and lag effects in time series data.")
+                    n_lags = st.slider("Number of Lags to Show", 1, 40, 20)
+                    if len(df[value_col].dropna()) > n_lags:
+                        try:
+                            fig_acf, ax_acf = plt.subplots(figsize=(10, 4))
+                            plot_acf(df[value_col].dropna(), ax=ax_acf, lags=n_lags)
+                            ax_acf.set_title("Autocorrelation (ACF)")
+                            st.pyplot(fig_acf)
+
+                            fig_pacf, ax_pacf = plt.subplots(figsize=(10, 4))
+                            plot_pacf(df[value_col].dropna(), ax=ax_pacf, lags=n_lags)
+                            ax_pacf.set_title("Partial Autocorrelation (PACF)")
+                            st.pyplot(fig_pacf)
+                        except Exception as e:
+                            st.error(f"Could not generate ACF/PACF plots: {e}")
+                    else:
+                        st.warning(f"Not enough data points to calculate {n_lags} lags.")
 
         elif selected_eda == "🔢 Statistical Summary & Tests":
             st.subheader("🔢 Detailed Statistical Summary & Hypothesis Tests")
@@ -1078,7 +1112,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 st.info("ANOVA requires at least two numeric columns and one categorical column with multiple groups.")
 
 
-        elif selected_eda == "🧬 Multivariate Analysis": # This was the old name for the section
+        elif selected_eda == "🧬 Multivariate Analysis":
             st.subheader("🧬 Advanced Multivariate Visualizations")
             numeric_cols_mv = df.select_dtypes(include=np.number).columns.tolist()
 
@@ -1260,6 +1294,29 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                     fig_elbow = px.line(x=list(k_range), y=inertia, title="Elbow Method for K-Means", markers=True, labels={'x':'Number of Clusters (K)', 'y':'Inertia'})
                     st.plotly_chart(fig_elbow, use_container_width=True)
                     st.caption("Look for the 'elbow' point where adding more clusters doesn't significantly reduce inertia.")
+
+                    st.markdown("#### K-Means Clustering Visualization")
+                    k_optimal = st.number_input("Select the number of clusters (K) based on the elbow plot:", min_value=2, max_value=15, value=3, step=1)
+                    
+                    if st.button("Run K-Means and Visualize"):
+                        with st.spinner("Running K-Means..."):
+                            # Perform K-Means
+                            kmeans = KMeans(n_clusters=k_optimal, random_state=42, n_init='auto')
+                            cluster_df['cluster'] = kmeans.fit_predict(scaled_cluster_data)
+
+                            # Reduce dimensionality to 2D for visualization
+                            pca = PCA(n_components=2)
+                            components = pca.fit_transform(scaled_cluster_data)
+                            cluster_df['pca1'] = components[:, 0]
+                            cluster_df['pca2'] = components[:, 1]
+                            
+                            # Visualize
+                            fig_cluster = px.scatter(cluster_df, x='pca1', y='pca2', color='cluster', color_continuous_scale=px.colors.qualitative.Vivid, title=f'K-Means Clustering (K={k_optimal}) on 2D PCA Projection', labels={'pca1': 'Principal Component 1', 'pca2': 'Principal Component 2'})
+                            st.plotly_chart(fig_cluster, use_container_width=True)
+
+                            st.markdown("#### Cluster Profiles")
+                            st.info("Showing the mean of numeric features for each cluster.")
+                            st.dataframe(cluster_df.groupby('cluster')[numeric_cols_cluster].mean())
 
         elif selected_eda == "🧮 Feature Engineering":
             st.subheader("🧮 Feature Engineering")
@@ -2386,7 +2443,7 @@ print(df_clean.info())"""
             "Python Code:",
             value=st.session_state.get('python_code', '# Your Python code here\nprint("Hello, Data Science!")'),
             height=300,
-            help="Use 'df' to access your uploaded data. Available libraries: pandas, numpy, matplotlib, seaborn, scipy, sklearn, plotly"
+            help="Use 'df' to access data. Create a 'fig' or 'figs' variable to display Plotly charts. Matplotlib plots are auto-captured."
         )
 
         col1, col2, col3 = st.columns([1, 1, 2])
@@ -2403,17 +2460,28 @@ print(df_clean.info())"""
                 st.success("Code saved to history!")
 
         # Code execution results
-        if 'python_output' in st.session_state or ('python_plots' in st.session_state and st.session_state.python_plots):
+        if 'python_output' in st.session_state or \
+           ('python_plots' in st.session_state and st.session_state.python_plots) or \
+           ('python_plotly_figs' in st.session_state and st.session_state.python_plotly_figs):
             st.subheader("📊 Execution Results")
             if 'python_output' in st.session_state and st.session_state.python_output:
                 st.code(st.session_state.python_output)
 
-            if 'python_plots' in st.session_state and st.session_state.python_plots:
+            if ('python_plots' in st.session_state and st.session_state.python_plots) or \
+               ('python_plotly_figs' in st.session_state and st.session_state.python_plotly_figs):
                 st.subheader("📈 Generated Plots")
-                for fig in st.session_state.python_plots:
-                    st.pyplot(fig)
-                # After displaying all plots, close them to prevent carrying over to the next execution.
-                plt.close('all')
+                
+                # Display Matplotlib plots
+                if 'python_plots' in st.session_state and st.session_state.python_plots:
+                    for fig in st.session_state.python_plots:
+                        st.pyplot(fig)
+                    # After displaying all plots, close them to prevent carrying over to the next execution.
+                    plt.close('all')
+                
+                # Display Plotly plots
+                if 'python_plotly_figs' in st.session_state and st.session_state.python_plotly_figs:
+                    for fig in st.session_state.python_plotly_figs:
+                        st.plotly_chart(fig, use_container_width=True)
 
         # Code history
         if st.session_state.python_history:
@@ -2889,22 +2957,40 @@ for title in titles:
         if not url:
             st.error("Please enter a URL!")
         else:
-            # Pass necessary params explicitly or ensure they are in locals() if that's the design
-            current_locals = locals()
-            scrape_params = {k: current_locals.get(k) for k in ['tag', 'class_name', 'limit', 'selector', 'table_index', 'filter_text', 'min_width', 'custom_code', 'user_agent', 'headers', 'delay', 'timeout']}
+            # Build params dict explicitly for robustness
+            scrape_params = {
+                'headers': headers,
+                'delay': delay,
+                'timeout': timeout
+            }
+            if headers:
+                scrape_params['user_agent'] = user_agent
+            
+            if method == "Extract Text by Tag":
+                scrape_params.update({'tag': tag, 'class_name': class_name, 'limit': limit})
+            elif method == "Extract by CSS Selector":
+                scrape_params.update({'selector': selector, 'limit': limit})
+            elif method == "Extract Table Data":
+                scrape_params.update({'table_index': table_index})
+            elif method == "Extract All Links":
+                scrape_params.update({'filter_text': filter_text})
+            elif method == "Extract Images":
+                scrape_params.update({'min_width': min_width})
+            elif method == "Custom BeautifulSoup":
+                scrape_params.update({'custom_code': custom_code})
+
             scrape_website(url, method, scrape_params, export_format)
 
-def scrape_website(url, method, params, export_format):
+def scrape_website(url: str, method: str, params: dict, export_format: str) -> None:
     """Perform web scraping based on selected method"""
     try:
         headers_dict = {
             'User-Agent': params.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         } if params.get('headers') else {}
         
-        # Use the delay parameter
         with st.spinner("Scraping website..."):
             # Make request
-            time.sleep(float(params.get('delay', 1.0))) # Ensure delay is float
+            time.sleep(float(params.get('delay', 1.0)))
             response = requests.get(url, headers=headers_dict, timeout=params.get('timeout', 10))
             response.raise_for_status()
             

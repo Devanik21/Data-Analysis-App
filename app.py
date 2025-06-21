@@ -23,6 +23,7 @@ from sqlalchemy import create_engine, text
 import time
 import re
 import json
+import google.generativeai as genai
 
 warnings.filterwarnings('ignore')
 
@@ -93,9 +94,25 @@ if 'python_history' not in st.session_state:
     st.session_state.python_history = []
 if 'current_query' not in st.session_state: # For SQL Query tool
     st.session_state.current_query = 'SELECT * FROM data LIMIT 10;'
+if 'gemini_model' not in st.session_state:
+    st.session_state.gemini_model = None
+if 'python_plots' not in st.session_state:
+    st.session_state.python_plots = []
 
 # Main Title
 st.markdown('<h1 class="main-header">🔬 Advanced Data Analysis Suite</h1>', unsafe_allow_html=True)
+
+# --- Sidebar Configuration ---
+st.sidebar.title("⚙️ Configuration")
+api_key = st.sidebar.text_input("Google AI API Key", type="password", help="Get your key from https://aistudio.google.com/app/apikey")
+
+if api_key:
+    try:
+        genai.configure(api_key=api_key)
+        st.session_state.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+        st.sidebar.success("Gemini model configured!")
+    except Exception as e:
+        st.sidebar.error(f"Invalid API Key: {e}")
 
 # Sidebar for navigation
 st.sidebar.title("🧭 Navigation")
@@ -107,7 +124,8 @@ tools = [
     "💼 Power BI Dashboard",
     "🐍 Python Advanced Analytics",
     "🐼 Pandas Query Tool",
-    "🌐 Web Scraping Tool"
+    "🌐 Web Scraping Tool",
+    "🤖 AI-Powered Insights (Gemini)"
 ]
 
 selected_tool = st.sidebar.selectbox("Select Analysis Tool", tools)
@@ -235,19 +253,38 @@ def generate_chart(df, config, title):
     except Exception as e:
         st.error(f"Error generating chart: {str(e)}")
 
-# Tool Implementation
+def generate_gemini_content(prompt_text):
+    """Generates content using the Gemini model."""
+    if not st.session_state.gemini_model:
+        st.error("Gemini model not configured. Please enter your API key in the sidebar.")
+        return None
+    try:
+        with st.spinner("🤖 Gemini is thinking..."):
+            response = st.session_state.gemini_model.generate_content(prompt_text)
+            return response.text
+    except Exception as e:
+        st.error(f"An error occurred with the Gemini API: {e}")
+        return None
 
 def execute_python_code(code, df):
-    """Execute Python code safely"""
+    """Execute Python code safely and capture output and plots."""
+    output_buffer = io.StringIO()
+    original_stdout = sys.stdout
+    sys.stdout = output_buffer
+
+    # Clear previous plots from session state
+    st.session_state.python_plots = []
+
     try:
         # Create a safe execution environment
         exec_globals = {
-            'df': df,
+            'df': df.copy(), # Use a copy to prevent modification of the original df in session state
             'pd': pd,
             'np': np,
             'plt': plt,
             'px': px,
             'go': go,
+            'sns': sns, # Add seaborn
             'stats': stats,
             'StandardScaler': StandardScaler,
             'PCA': PCA,
@@ -255,26 +292,23 @@ def execute_python_code(code, df):
             'IsolationForest': IsolationForest,
             'LabelEncoder': LabelEncoder
         }
-        
-        # Capture output
-        from io import StringIO
-        import sys
-        
-        old_stdout = sys.stdout
-        sys.stdout = captured_output = StringIO()
-        
+
         # Execute code
         exec(code, exec_globals)
-        
-        # Get output
-        sys.stdout = old_stdout
-        output = captured_output.getvalue()
-        
-        st.session_state.python_output = output
-        
+
+        # Capture any matplotlib/seaborn plots created
+        fig_nums = plt.get_fignums()
+        for i in fig_nums:
+            fig = plt.figure(i)
+            st.session_state.python_plots.append(fig)
+
     except Exception as e:
-        st.error(f"Execution Error: {str(e)}")
-        st.session_state.python_output = f"Error: {str(e)}"
+        st.session_state.python_output = f"Execution Error: {str(e)}"
+    else:
+        st.session_state.python_output = output_buffer.getvalue()
+    finally:
+        # Restore stdout
+        sys.stdout = original_stdout
 # Tool Implementation
 
 if selected_tool == "📤 Data Upload": # Keep this as the first tool
@@ -2270,17 +2304,16 @@ elif selected_tool == "💼 Power BI Dashboard":
                 st.error(f"An error occurred while generating the automatic dashboard: {e}")
                 st.error("Please ensure your data is suitable for the selected visualizations or try uploading a different dataset.")
                 
-# Continue with Python Advanced Analytics
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics Engine</h2>', unsafe_allow_html=True)
-    
+
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
-        
+
         st.subheader("💻 Python Code Editor")
-        
+
         # Code templates
         templates = {
             "Data Info": """# Basic data information
@@ -2291,7 +2324,23 @@ print("\\nMissing Values:")
 print(df.isnull().sum())
 print("\\nBasic Statistics:")
 print(df.describe())""",
-            
+
+            "Plotting with Matplotlib": """# Example plot using Matplotlib and Seaborn
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+numeric_cols = df.select_dtypes(include=np.number).columns
+if len(numeric_cols) > 0:
+    plt.figure(figsize=(10, 6))
+    sns.histplot(df[numeric_cols[0]], kde=True)
+    plt.title(f'Distribution of {numeric_cols[0]}')
+    plt.xlabel(numeric_cols[0])
+    plt.ylabel('Frequency')
+    # The plot will be automatically captured and displayed below.
+else:
+    print("No numeric columns to plot.")
+""",
+
             "Advanced Statistics": """# Advanced statistical analysis
 import scipy.stats as stats
 numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -2300,42 +2349,12 @@ for col in numeric_cols[:3]:  # First 3 numeric columns
     print(f"\\n=== {col} ===")
     print(f"Skewness: {stats.skew(df[col].dropna()):.3f}")
     print(f"Kurtosis: {stats.kurtosis(df[col].dropna()):.3f}")
-    
+
     # Normality test
     if len(df[col].dropna()) > 3:
         stat, p_value = stats.shapiro(df[col].dropna().sample(min(5000, len(df[col].dropna()))))
         print(f"Shapiro-Wilk p-value: {p_value:.6f}")""",
-            
-            "Machine Learning": """# Basic ML analysis
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
 
-# Prepare data
-numeric_df = df.select_dtypes(include=[np.number]).dropna()
-
-if len(numeric_df.columns) > 1:
-    # Standardize features
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(numeric_df)
-    
-    # PCA Analysis
-    pca = PCA()
-    pca_data = pca.fit_transform(scaled_data)
-    
-    print("PCA Explained Variance Ratio:")
-    for i, ratio in enumerate(pca.explained_variance_ratio_[:5]):
-        print(f"PC{i+1}: {ratio:.3f}")
-    
-    # K-Means Clustering
-    kmeans = KMeans(n_clusters=3, random_state=42)
-    clusters = kmeans.fit_predict(scaled_data)
-    
-    print(f"\\nCluster distribution:")
-    unique, counts = np.unique(clusters, return_counts=True)
-    for cluster, count in zip(unique, counts):
-        print(f"Cluster {cluster}: {count} points")""",
-            
             "Data Cleaning": """# Advanced data cleaning
 print("Original shape:", df.shape)
 
@@ -2350,23 +2369,10 @@ print(f"After removing high-missing columns: {df_clean.shape}")
 df_clean = df_clean.drop_duplicates()
 print(f"After removing duplicates: {df_clean.shape}")
 
-# Handle outliers using IQR method
-numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
-
-for col in numeric_cols:
-    Q1 = df_clean[col].quantile(0.25)
-    Q3 = df_clean[col].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    outliers_count = len(df_clean[(df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)])
-    print(f"{col}: {outliers_count} outliers detected")
-
 print("\\nCleaned dataset info:")
 print(df_clean.info())"""
         }
-        
+
         # Template selection
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -2374,20 +2380,20 @@ print(df_clean.info())"""
         with col2:
             if st.button("📥 Use Template"):
                 st.session_state.python_code = templates[selected_template]
-        
+
         # Code editor
         code = st.text_area(
             "Python Code:",
             value=st.session_state.get('python_code', '# Your Python code here\nprint("Hello, Data Science!")'),
             height=300,
-            help="Use 'df' to access your uploaded data. Available libraries: pandas, numpy, scipy, sklearn, plotly"
+            help="Use 'df' to access your uploaded data. Available libraries: pandas, numpy, matplotlib, seaborn, scipy, sklearn, plotly"
         )
-        
+
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
             if st.button("🚀 Execute Code", type="primary"):
                 execute_python_code(code, df)
-        
+
         with col2:
             if st.button("💾 Save to History"):
                 st.session_state.python_history.append({
@@ -2395,18 +2401,20 @@ print(df_clean.info())"""
                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
                 st.success("Code saved to history!")
-        
+
         # Code execution results
-        if 'python_output' in st.session_state:
+        if 'python_output' in st.session_state or ('python_plots' in st.session_state and st.session_state.python_plots):
             st.subheader("📊 Execution Results")
-            if st.session_state.python_output:
+            if 'python_output' in st.session_state and st.session_state.python_output:
                 st.code(st.session_state.python_output)
-            
+
             if 'python_plots' in st.session_state and st.session_state.python_plots:
                 st.subheader("📈 Generated Plots")
-                for plot in st.session_state.python_plots:
-                    st.plotly_chart(plot, use_container_width=True)
-        
+                for fig in st.session_state.python_plots:
+                    st.pyplot(fig)
+                # After displaying all plots, close them to prevent carrying over to the next execution.
+                plt.close('all')
+
         # Code history
         if st.session_state.python_history:
             st.subheader("📚 Code History")
@@ -3034,8 +3042,106 @@ def scrape_website(url, method, params, export_format):
     except Exception as e:
         st.error(f"Web scraping error: {str(e)}")
 
+# --- AI-Powered Insights (Gemini) ---
+if selected_tool == "🤖 AI-Powered Insights (Gemini)":
+    st.markdown('<h2 class="tool-header">🤖 AI-Powered Insights (Gemini)</h2>', unsafe_allow_html=True)
+
+    if st.session_state.df is None:
+        st.warning("Please upload data first to use AI insights!")
+    elif not st.session_state.gemini_model:
+        st.warning("Please configure your Google AI API Key in the sidebar to enable this tool.")
+    else:
+        df = st.session_state.df
+        
+        ai_options = [
+            "📝 Automated Data Summary",
+            "💬 Natural Language to Code",
+            "🧠 Code Explanation"
+        ]
+        selected_ai_task = st.selectbox("Select an AI Task", ai_options)
+
+        if selected_ai_task == "📝 Automated Data Summary":
+            st.subheader("📝 Automated Data Summary")
+            if st.button("Generate Summary", type="primary"):
+                # Create a comprehensive prompt
+                with io.StringIO() as buffer:
+                    df.info(buf=buffer)
+                    info_str = buffer.getvalue()
+                
+                prompt = f"""
+You are an expert data analyst. Analyze the following dataset and provide a concise summary.
+The dataset has {df.shape[0]} rows and {df.shape[1]} columns.
+
+Here is the output of `df.info()`:
+```
+{info_str}
+```
+
+Here is the output of `df.describe()` for numeric columns:
+```
+{df.describe(include=np.number).to_string()}
+```
+
+Here is the output of `df.describe()` for categorical columns:
+```
+{df.describe(include=['object', 'category']).to_string()}
+```
+
+Based on this information, provide a summary covering:
+1.  **Overall Structure**: Mention the number of rows, columns, and data types.
+2.  **Key Numeric Insights**: Talk about the central tendency, spread, and potential outliers for important numeric columns.
+3.  **Key Categorical Insights**: Discuss the distribution, cardinality, and most frequent categories for important object/categorical columns.
+4.  **Data Quality Issues**: Point out any potential issues like missing values, high cardinality columns, or columns that might need type conversion.
+5.  **Next Steps**: Suggest 2-3 potential next steps for analysis or feature engineering.
+
+Keep the summary clear, concise, and use markdown for formatting.
+"""
+                summary = generate_gemini_content(prompt)
+                if summary:
+                    st.markdown(summary)
+
+        elif selected_ai_task == "💬 Natural Language to Code":
+            st.subheader("💬 Natural Language to Code")
+            
+            code_type = st.radio("Select Code Type", ["SQL", "Pandas"], horizontal=True)
+            
+            query = st.text_area("What would you like to do with the data?", placeholder="e.g., 'Find the top 5 cities with the highest average income'")
+            
+            if st.button("Generate Code", type="primary"):
+                if query:
+                    # Get schema for the prompt
+                    schema = pd.DataFrame({
+                        'Column': df.columns,
+                        'DataType': df.dtypes.astype(str)
+                    }).to_string()
+
+                    if code_type == "SQL":
+                        prompt = f"You are an expert SQL developer.\nGiven a table named `data` with the following schema:\n{schema}\n\nWrite a SQL query to answer the following question:\n\"{query}\"\n\nProvide only the SQL code in a single code block, without any explanation."
+                    else: # Pandas
+                        prompt = f"You are an expert Python developer using pandas.\nGiven a pandas DataFrame named `df` with the following schema:\n{schema}\n\nWrite Python code using pandas to answer the following question:\n\"{query}\"\n\nAssume the DataFrame is already loaded in a variable named `df`.\nProvide only the Python code in a single code block, without any explanation."
+                    
+                    generated_code = generate_gemini_content(prompt)
+                    if generated_code:
+                        # Clean up the response to get only the code block
+                        cleaned_code = re.sub(r"```(python|sql)?\n", "", generated_code)
+                        cleaned_code = re.sub(r"```", "", cleaned_code).strip()
+                        st.code(cleaned_code, language=code_type.lower())
+                else:
+                    st.warning("Please enter a query.")
+
+        elif selected_ai_task == "🧠 Code Explanation":
+            st.subheader("🧠 Code Explanation")
+            code_to_explain = st.text_area("Paste your code here (SQL or Python)", height=200)
+            
+            if st.button("Explain Code", type="primary"):
+                if code_to_explain:
+                    prompt = f"You are an expert code reviewer and teacher.\nExplain the following code snippet step-by-step.\nDescribe what the code does, its purpose, and how it works.\nUse markdown for formatting.\n\nCode:\n```\n{code_to_explain}\n```"
+                    explanation = generate_gemini_content(prompt)
+                    if explanation:
+                        st.markdown(explanation)
+                else:
+                    st.warning("Please paste some code to explain.")
+
 # Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction
 if 'df' in st.session_state and st.session_state.df is not None and 'df' not in locals():
     df = st.session_state.df
-
-

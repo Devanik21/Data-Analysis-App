@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -3036,6 +3037,3 @@ def scrape_website(url, method, params, export_format):
 # Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction
 if 'df' in st.session_state and st.session_state.df is not None and 'df' not in locals():
     df = st.session_state.df
-
-
-

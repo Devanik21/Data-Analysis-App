@@ -1,6 +1,7 @@
 duckdb
 streamlit
 google.generativeai
+statsmodels
 pandas
 numpy
 plotly

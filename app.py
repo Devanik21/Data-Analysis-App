@@ -30,6 +30,7 @@ import json
 import pickle
 from typing import Optional, Dict, Any, List
 import google.generativeai as genai
+from wordcloud import WordCloud
 
 warnings.filterwarnings('ignore')
 
@@ -160,7 +161,7 @@ if loaded_session_file is not None:
         for key, value in loaded_state.items():
             st.session_state[key] = value
         st.sidebar.success("Session loaded successfully! Refreshing app...")
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.sidebar.error(f"Error loading session file: {e}. The file may be corrupted or from an incompatible version.")
 
@@ -242,8 +243,17 @@ def advanced_outlier_detection(df: pd.DataFrame, column: str) -> dict:
     iso_forest = IsolationForest(contamination=0.1, random_state=42)
     outlier_labels = iso_forest.fit_predict(df[[column]].dropna())
     iso_outliers = sum(outlier_labels == -1)
-    methods['Isolation Forest'] = iso_outliers
+    methods['Isolation Forest'] = iso_outliers    
     
+    # Local Outlier Factor (LOF)
+    # LOF needs more than 1 sample
+    if len(df[[column]].dropna()) > 5:
+        from sklearn.neighbors import LocalOutlierFactor
+        lof = LocalOutlierFactor(n_neighbors=min(20, len(df[[column]].dropna())-1), contamination='auto')
+        lof_labels = lof.fit_predict(df[[column]].dropna())
+        lof_outliers = sum(lof_labels == -1)
+        methods['Local Outlier Factor'] = lof_outliers
+
     return methods
 
 def generate_chart(df: pd.DataFrame, config: dict, title: str) -> None:
@@ -624,7 +634,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                         df_cleaned.dropna(subset=[missing_col], inplace=True)
                         st.session_state.df = df_cleaned
                         st.success(f"Dropped rows with NaNs in '{missing_col}'. New shape: {df_cleaned.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
 
             st.markdown("#### 🔄 Change Data Type")
             type_col = st.selectbox("Select column to change type", df.columns.tolist(), key="clean_type_col")
@@ -639,7 +649,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                             df_typed[type_col] = df_typed[type_col].astype(new_type)
                         st.session_state.df = df_typed
                         st.success(f"Converted '{type_col}' to {new_type}.")
-                        st.rerun()
+                        st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Error converting type: {e}")
 
@@ -649,7 +659,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                 removed_count = len(df) - len(df_no_duplicates)
                 st.session_state.df = df_no_duplicates
                 st.success(f"Removed {removed_count} duplicate rows. New shape: {df_no_duplicates.shape}")
-                st.rerun()
+                st.experimental_rerun()
 
             st.markdown("#### ✏️ Rename Columns")
             col_to_rename = st.selectbox("Select column to rename", df.columns.tolist(), key="rename_col_select")
@@ -661,7 +671,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                         df_renamed.rename(columns={col_to_rename: new_col_name_rename}, inplace=True)
                         st.session_state.df = df_renamed
                         st.success(f"Column '{col_to_rename}' renamed to '{new_col_name_rename}'.")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.warning("Please enter a valid new column name different from the original.")
             
@@ -672,7 +682,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                     df_dropped = df.drop(columns=cols_to_drop)
                     st.session_state.df = df_dropped
                     st.success(f"Dropped columns: {', '.join(cols_to_drop)}. New shape: {df_dropped.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
                 else:
                     st.warning("Please select at least one column to drop.")
 
@@ -779,7 +789,7 @@ Provide only the SQL code in a single code block, without any explanation or sur
                             cleaned_sql = re.sub(r"```", "", cleaned_sql).strip()
                             st.session_state.current_query = cleaned_sql
                             st.success("AI-generated SQL populated in the editor!")
-                            st.rerun() # Rerun to update the text_area
+                            st.experimental_rerun() # Rerun to update the text_area
                     else:
                         st.warning("Please enter a description for the AI to generate a query.")
 
@@ -792,7 +802,7 @@ Provide only the SQL code in a single code block, without any explanation or sur
                         st.caption(f"Rows: {hist['rows']} | Duration: {hist.get('duration', 0.0):.4f}s")
                         if st.button("Reuse this query", key=f"reuse_sql_{i}"):
                             st.session_state.current_query = hist['query']
-                            st.rerun()
+                            st.experimental_rerun()
             else:
                 st.info("No queries run in this session yet.")
 
@@ -965,11 +975,16 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 # --- Top Row: Key Metrics ---
                 st.markdown("#### Key Statistical Metrics")
                 metric_cols = st.columns(5)
-                metric_cols[0].metric("Mean", f"{col_data.mean():.2f}")
-                metric_cols[1].metric("Median", f"{col_data.median():.2f}")
-                metric_cols[2].metric("Std. Dev.", f"{col_data.std():.2f}")
-                metric_cols[3].metric("Skewness", f"{col_data.skew():.2f}")
-                metric_cols[4].metric("Kurtosis", f"{col_data.kurtosis():.2f}")
+                mean_val = col_data.mean()
+                median_val = col_data.median()
+                std_val = col_data.std()
+                skew_val = col_data.skew()
+                kurt_val = col_data.kurtosis()
+                metric_cols[0].metric("Mean", f"{mean_val:.2f}")
+                metric_cols[1].metric("Median", f"{median_val:.2f}")
+                metric_cols[2].metric("Std. Dev.", f"{std_val:.2f}")
+                metric_cols[3].metric("Skewness", f"{skew_val:.2f}")
+                metric_cols[4].metric("Kurtosis", f"{kurt_val:.2f}")
                 
                 st.markdown("---")
 
@@ -1008,6 +1023,36 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                             st.success("The data appears to be normally distributed.")
                         else:
                             st.warning("The data does not appear to be normally distributed.")
+                        
+                        if st.button("🤖 Get AI Interpretation", key="dist_ai_interp"):
+                            if not st.session_state.gemini_model:
+                                st.warning("Please configure your Google AI API Key in the sidebar.")
+                            else:
+                                prompt = f"""
+You are an expert data analyst. A user is analyzing the distribution of a numeric column named '{selected_col}'.
+Here are the key statistics:
+- Mean: {mean_val:.4f}
+- Median: {median_val:.4f}
+- Standard Deviation: {std_val:.4f}
+- Skewness: {skew_val:.4f}
+- Kurtosis: {kurt_val:.4f}
+
+A Shapiro-Wilk test for normality resulted in a p-value of {shapiro_p:.6f}.
+
+Based on these statistics and the p-value, provide a concise interpretation of the column's distribution.
+Address the following points in your interpretation:
+1.  **Central Tendency**: Compare the mean and median. What does this suggest about the distribution's symmetry?
+2.  **Shape (Skewness & Kurtosis)**: Explain what the skewness value indicates (e.g., left-skewed, right-skewed, symmetric). Explain what the kurtosis value suggests about the tails and peak of the distribution compared to a normal distribution.
+3.  **Normality**: Based on the Shapiro-Wilk p-value (where p <= 0.05 typically rejects normality), conclude whether the data is likely to be normally distributed.
+4.  **Overall Summary**: Provide a brief, overall summary of the column's characteristics.
+
+Use markdown for formatting.
+"""
+                                interpretation = generate_gemini_content(prompt)
+                                if interpretation:
+                                    st.markdown("---")
+                                    st.markdown("#### 🤖 AI-Powered Interpretation")
+                                    st.markdown(interpretation)
                     else:
                         st.info("Not enough data for Shapiro-Wilk test (requires > 2 samples).")
         
@@ -1018,12 +1063,21 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             if len(numeric_cols) < 2:
                 st.warning("Need at least 2 numeric columns for correlation analysis!")
             else:
-                corr_matrix = df[numeric_cols].corr()
+                corr_method = st.selectbox(
+                    "Select Correlation Method", 
+                    ["pearson", "spearman", "kendall"], 
+                    help="""
+- **Pearson**: Measures linear correlation. Assumes data is normally distributed.
+- **Spearman**: Measures rank correlation. Good for non-linear, monotonic relationships.
+- **Kendall**: Measures rank correlation. Robust to outliers and smaller sample sizes.
+"""
+                )
+                corr_matrix = df[numeric_cols].corr(method=corr_method)
                 
                 col1, col2 = st.columns([2, 3])
 
                 with col1:
-                    st.markdown("##### Correlation Table")
+                    st.markdown(f"##### {corr_method.capitalize()} Correlation Table")
                     st.dataframe(corr_matrix)
                     
                     st.markdown("##### Strongest Correlations")
@@ -1140,53 +1194,59 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 
                 with col1:
                     st.subheader("🔍 Outlier Detection Results")
+                    st.info("Number of outliers detected by different methods.")
                     for method, count in outlier_methods.items():
                         st.metric(f"{method} Outliers", count, help=f"Number of outliers detected by {method} method.")
                 
                 with col2:
-                    # Scatter plot with outliers highlighted
+                    st.subheader("📊 Outlier Visualization")
+                    viz_method = st.selectbox("Select method to visualize", list(outlier_methods.keys()))
+
                     fig = go.Figure()
-                    
-                    # Normal points
+                    col_data = df[[selected_col]].dropna()
+
+                    # Determine outliers based on selected method
+                    if viz_method == 'IQR':
+                        Q1 = col_data[selected_col].quantile(0.25)
+                        Q3 = col_data[selected_col].quantile(0.75)
+                        IQR = Q3 - Q1
+                        outlier_mask = (col_data[selected_col] < Q1 - 1.5 * IQR) | (col_data[selected_col] > Q3 + 1.5 * IQR)
+                    elif viz_method == 'Z-Score':
+                        z_scores = np.abs(stats.zscore(col_data[selected_col]))
+                        outlier_mask = z_scores > 3
+                    elif viz_method == 'Isolation Forest':
+                        iso_forest = IsolationForest(contamination=0.1, random_state=42)
+                        outlier_labels = iso_forest.fit_predict(col_data)
+                        outlier_mask = outlier_labels == -1
+                    elif viz_method == 'Local Outlier Factor':
+                        from sklearn.neighbors import LocalOutlierFactor
+                        lof = LocalOutlierFactor(n_neighbors=min(20, len(col_data)-1), contamination='auto')
+                        outlier_labels = lof.fit_predict(col_data)
+                        outlier_mask = outlier_labels == -1
+                    else:
+                        outlier_mask = pd.Series([False] * len(col_data), index=col_data.index)
+
+                    # Plot normal points
                     fig.add_trace(go.Scatter(
-                        x=df.index,
-                        y=df[selected_col],
+                        x=col_data.index[~outlier_mask],
+                        y=col_data[selected_col][~outlier_mask],
                         mode='markers',
                         name='Normal',
                         marker=dict(color='blue', size=4)
                     ))
                     
-                    # IQR outliers
-                    Q1 = df[selected_col].quantile(0.25)
-                    Q3 = df[selected_col].quantile(0.75)
-                    IQR = Q3 - Q1
-                    outliers = df[(df[selected_col] < Q1 - 1.5 * IQR) | (df[selected_col] > Q3 + 1.5 * IQR)]
-                    
+                    # Plot outliers
                     fig.add_trace(go.Scatter(
-                        x=outliers.index,
-                        y=outliers[selected_col],
+                        x=col_data.index[outlier_mask],
+                        y=col_data[selected_col][outlier_mask],
                         mode='markers',
-                        name='Outliers',
+                        name=f'{viz_method} Outliers',
                         marker=dict(color='red', size=8, symbol='x')
                     ))
                     
-                    fig.update_layout(title=f"Outlier Detection: {selected_col}")
+                    fig.update_layout(title=f"Outlier Visualization for {selected_col} using {viz_method}")
                     st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("#### Local Outlier Factor (LOF) - Conceptual")
-                st.info("LOF identifies outliers by measuring the local density deviation of a given data point with respect to its neighbors. Implementation requires careful parameter tuning (n_neighbors, contamination).")
-                if len(df[[selected_col]].dropna()) > 5: # LOF needs some data
-                    from sklearn.neighbors import LocalOutlierFactor
-                    lof = LocalOutlierFactor(n_neighbors=min(20, len(df[[selected_col]].dropna())-1), contamination='auto')
-                    lof_labels = lof.fit_predict(df[[selected_col]].dropna())
-                    lof_outliers = sum(lof_labels == -1)
-                    st.metric("LOF Outliers (Conceptual)", lof_outliers, help="Number of outliers detected by LOF (parameters not tuned).")
-                else:
-                    st.warning("Not enough data points for LOF.")
 
-
-
-        
         elif selected_eda == "📊 Missing Value Analysis":
             missing_data = df.isnull().sum()
             missing_percent = (missing_data / len(df)) * 100
@@ -1769,6 +1829,93 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                             st.markdown("#### Cluster Profiles")
                             st.info("Showing the mean of numeric features for each cluster.")
                             st.dataframe(cluster_df.groupby('cluster')[numeric_cols_cluster].mean())
+
+        elif selected_eda == "📝 Text Analysis Utilities":
+            st.subheader("📝 Text Column Analysis")
+            st.info("Analyze text-based columns to find word frequencies and patterns. Requires `wordcloud` library.")
+            text_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            
+            if not text_cols:
+                st.warning("No text (object or category type) columns found for analysis.")
+            else:
+                text_col = st.selectbox("Select a Text Column to Analyze", text_cols)
+                
+                if text_col:
+                    text_series = df[text_col].dropna().astype(str)
+                    
+                    st.markdown("#### Basic Statistics")
+                    stats_cols = st.columns(4)
+                    stats_cols[0].metric("Total Words", f"{text_series.str.split().str.len().sum():,}")
+                    stats_cols[1].metric("Total Characters", f"{text_series.str.len().sum():,}")
+                    
+                    all_words = ' '.join(text_series).split()
+                    if all_words:
+                        avg_word_len = np.mean([len(word) for word in all_words])
+                        stats_cols[2].metric("Avg. Word Length", f"{avg_word_len:.2f}")
+                    else:
+                        stats_cols[2].metric("Avg. Word Length", "N/A")
+
+                    stats_cols[3].metric("Avg. Words per Entry", f"{text_series.str.split().str.len().mean():.2f}")
+
+                    st.markdown("---")
+                    st.markdown("#### Word Frequency Analysis")
+                    
+                    text_corpus = " ".join(text for text in text_series)
+                    
+                    if text_corpus.strip():
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("##### Word Cloud")
+                            try:
+                                wordcloud = WordCloud(width=400, height=300, background_color='white', colormap='viridis').generate(text_corpus)
+                                fig_wc, ax_wc = plt.subplots()
+                                ax_wc.imshow(wordcloud, interpolation='bilinear')
+                                ax_wc.axis('off')
+                                st.pyplot(fig_wc)
+                            except Exception as e:
+                                st.error(f"Could not generate word cloud: {e}")
+
+                        with col2:
+                            st.markdown("##### Top 20 Most Frequent Words")
+                            from collections import Counter
+                            words = [word for word in re.findall(r'\b\w+\b', text_corpus.lower())]
+                            word_counts = Counter(words)
+                            top_words_df = pd.DataFrame(word_counts.most_common(20), columns=['Word', 'Count'])
+                            fig_freq = px.bar(top_words_df, x='Count', y='Word', orientation='h')
+                            fig_freq.update_layout(yaxis={'categoryorder':'total ascending'}, height=400)
+                            st.plotly_chart(fig_freq, use_container_width=True)
+                    else:
+                        st.info("The selected column contains no text to analyze.")
+
+        elif selected_eda == "🌍 Geospatial Analysis (Basic)":
+            st.subheader("🌍 Geospatial Visualization")
+            st.info("This tool requires columns with latitude and longitude data.")
+
+            lat_col_guess = next((c for c in df.columns if 'lat' in c.lower()), None)
+            lon_col_guess = next((c for c in df.columns if 'lon' in c.lower() or 'lng' in c.lower()), None)
+            
+            geo_cols = st.columns(2)
+            with geo_cols[0]:
+                lat_col = st.selectbox("Select Latitude Column", df.columns, index=df.columns.get_loc(lat_col_guess) if lat_col_guess and lat_col_guess in df.columns else 0)
+            with geo_cols[1]:
+                lon_col = st.selectbox("Select Longitude Column", df.columns, index=df.columns.get_loc(lon_col_guess) if lon_col_guess and lon_col_guess in df.columns else 1)
+
+            st.markdown("#### Map Configuration")
+            map_config_cols = st.columns(3)
+            with map_config_cols[0]:
+                color_col = st.selectbox("Color points by (Optional)", ['None'] + df.columns.tolist(), key="geo_color")
+            with map_config_cols[1]:
+                size_col = st.selectbox("Size points by (Numeric, Optional)", ['None'] + df.select_dtypes(include=np.number).columns.tolist(), key="geo_size")
+            with map_config_cols[2]:
+                mapbox_style = st.selectbox("Map Style", ["open-street-map", "carto-positron", "carto-darkmatter", "stamen-terrain", "stamen-toner"], key="geo_style")
+            
+            if st.button("Generate Map", type="primary"):
+                try:
+                    map_df = df.dropna(subset=[lat_col, lon_col])
+                    fig_map = px.scatter_mapbox(map_df, lat=lat_col, lon=lon_col, color=None if color_col == 'None' else color_col, size=None if size_col == 'None' else size_col, mapbox_style=mapbox_style, zoom=1, title="Geospatial Data Distribution")
+                    st.plotly_chart(fig_map, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Could not generate map: {e}")
 
         elif selected_eda == "🧮 Feature Engineering":
             st.subheader("🧮 Feature Engineering")
@@ -2940,7 +3087,7 @@ print(df_clean.info())"""
                     st.caption(f"Executed: {entry['timestamp']}")
                     if st.button(f"Reuse Code {len(st.session_state.python_history) - i}", key=f"reuse_{i}"):
                         st.session_state.python_code = entry['code']
-                        st.rerun()
+                        st.experimental_rerun()
 
 elif selected_tool == "🐼 Pandas Query Tool":
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

@@ -865,6 +865,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
             "🏷️ Categorical Analysis",
             "⏰ Time Series Analysis",
             "🧬 Multivariate Analysis",
+            "🎨 Advanced Charting Studio",
             "🔢 Statistical Summary & Tests",
             "⚙️ Dimensionality Reduction",
             "🧩 Clustering Insights",
@@ -1465,6 +1466,137 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                                 st.error(f"Error generating parallel coordinates plot: {e}")
                 else:
                     st.warning("Parallel Coordinates Plot requires at least 3 numeric columns.")
+
+        elif selected_eda == "🎨 Advanced Charting Studio":
+            st.subheader("🎨 Advanced Charting Studio")
+            st.info("Select a plot type and configure its parameters to create custom visualizations.")
+
+            plot_types = [
+                "Scatter Plot", "Line Plot", "Bar Chart", "Histogram", "Box Plot",
+                "Violin Plot", "Density Heatmap", "Density Contour", "3D Scatter Plot",
+                "Pie Chart", "Sunburst Chart", "Treemap", "Funnel Chart",
+                "Polar Bar Chart", "Area Plot"
+            ]
+            selected_plot = st.selectbox("Select Plot Type", plot_types, key="studio_plot_type")
+
+            numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            all_cols = df.columns.tolist()
+            
+            st.markdown("#### ⚙️ Plot Configuration")
+            
+            fig = None
+
+            try:
+                if selected_plot == "Scatter Plot":
+                    cols = st.columns(4)
+                    x_ax = cols[0].selectbox("X-axis (Numeric)", numeric_cols, key="s_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, index=min(1, len(numeric_cols)-1), key="s_y")
+                    color = cols[2].selectbox("Color by (Optional)", ['None'] + all_cols, key="s_c")
+                    size = cols[3].selectbox("Size by (Numeric, Optional)", ['None'] + numeric_cols, key="s_s")
+                    if x_ax and y_ax:
+                        fig = px.scatter(df, x=x_ax, y=y_ax, 
+                                         color=None if color == 'None' else color,
+                                         size=None if size == 'None' else size,
+                                         title=f"Scatter Plot of {x_ax} vs {y_ax}")
+
+                elif selected_plot == "Line Plot":
+                    cols = st.columns(3)
+                    x_ax = cols[0].selectbox("X-axis", all_cols, key="l_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, key="l_y")
+                    color = cols[2].selectbox("Color by (Optional)", ['None'] + all_cols, key="l_c")
+                    if x_ax and y_ax:
+                        fig = px.line(df, x=x_ax, y=y_ax, color=None if color == 'None' else color,
+                                      title=f"Line Plot of {y_ax} over {x_ax}")
+
+                elif selected_plot == "Bar Chart":
+                    cols = st.columns(3)
+                    x_ax = cols[0].selectbox("X-axis (Categorical)", categorical_cols, key="b_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, key="b_y")
+                    color = cols[2].selectbox("Color by (Optional)", ['None'] + all_cols, key="b_c")
+                    if x_ax and y_ax:
+                        agg_func = st.selectbox("Aggregation", ["sum", "mean", "count"], key="b_agg")
+                        grouped_df = df.groupby(x_ax, as_index=False)[y_ax].agg(agg_func)
+                        fig = px.bar(grouped_df, x=x_ax, y=y_ax, color=None if color == 'None' else color,
+                                     title=f"Bar Chart of {agg_func.capitalize()} of {y_ax} by {x_ax}")
+
+                elif selected_plot == "Histogram":
+                    cols = st.columns(3)
+                    x_ax = cols[0].selectbox("X-axis (Numeric)", numeric_cols, key="h_x")
+                    color = cols[1].selectbox("Color by (Categorical, Optional)", ['None'] + categorical_cols, key="h_c")
+                    marginal = cols[2].selectbox("Marginal Plot", ['None', 'rug', 'box', 'violin'], key="h_m")
+                    if x_ax:
+                        fig = px.histogram(df, x=x_ax, color=None if color == 'None' else color,
+                                           marginal=None if marginal == 'None' else marginal,
+                                           title=f"Histogram of {x_ax}")
+
+                elif selected_plot in ["Box Plot", "Violin Plot"]:
+                    cols = st.columns(3)
+                    x_ax = cols[0].selectbox("X-axis (Categorical, Optional)", ['None'] + categorical_cols, key="bv_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, key="bv_y")
+                    color = cols[2].selectbox("Color by (Categorical, Optional)", ['None'] + categorical_cols, key="bv_c")
+                    if y_ax:
+                        plot_func = px.box if selected_plot == "Box Plot" else px.violin
+                        fig = plot_func(df, x=None if x_ax == 'None' else x_ax, y=y_ax,
+                                     color=None if color == 'None' else color,
+                                     title=f"{selected_plot} of {y_ax}")
+
+                elif selected_plot in ["Density Heatmap", "Density Contour"]:
+                    cols = st.columns(2)
+                    x_ax = cols[0].selectbox("X-axis (Numeric)", numeric_cols, key="d_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, index=min(1, len(numeric_cols)-1), key="d_y")
+                    if x_ax and y_ax:
+                        plot_func = px.density_heatmap if selected_plot == "Density Heatmap" else px.density_contour
+                        fig = plot_func(df, x=x_ax, y=y_ax, title=f"{selected_plot} of {x_ax} vs {y_ax}")
+
+                elif selected_plot == "3D Scatter Plot":
+                    cols = st.columns(4)
+                    x_ax = cols[0].selectbox("X-axis (Numeric)", numeric_cols, key="3d_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, index=min(1, len(numeric_cols)-1), key="3d_y")
+                    z_ax = cols[2].selectbox("Z-axis (Numeric)", numeric_cols, index=min(2, len(numeric_cols)-1), key="3d_z")
+                    color = cols[3].selectbox("Color by (Optional)", ['None'] + all_cols, key="3d_c")
+                    if x_ax and y_ax and z_ax:
+                        fig = px.scatter_3d(df, x=x_ax, y=y_ax, z=z_ax, color=None if color == 'None' else color, title=f"3D Scatter Plot")
+
+                elif selected_plot in ["Pie Chart", "Funnel Chart"]:
+                    cols = st.columns(2)
+                    names_col = cols[0].selectbox("Names/Stages (Categorical)", categorical_cols, key="pf_n")
+                    values_col = cols[1].selectbox("Values (Numeric)", numeric_cols, key="pf_v")
+                    if names_col and values_col:
+                        plot_func = px.pie if selected_plot == "Pie Chart" else px.funnel
+                        fig = plot_func(df, names=names_col, values=values_col, title=f"{selected_plot}")
+
+                elif selected_plot in ["Sunburst Chart", "Treemap"]:
+                    path = st.multiselect("Hierarchy Path (Categorical)", categorical_cols, key="st_p")
+                    values = st.selectbox("Values (Numeric)", numeric_cols, key="st_v")
+                    if path and values:
+                        plot_func = px.sunburst if selected_plot == "Sunburst Chart" else px.treemap
+                        fig = plot_func(df, path=path, values=values, title=f"{selected_plot}")
+
+                elif selected_plot == "Polar Bar Chart":
+                    cols = st.columns(3)
+                    r = cols[0].selectbox("Radius (Numeric)", numeric_cols, key="pol_r")
+                    theta = cols[1].selectbox("Angle (Categorical)", categorical_cols, key="pol_t")
+                    color = cols[2].selectbox("Color by (Optional)", ['None'] + all_cols, key="pol_c")
+                    if r and theta:
+                        fig = px.bar_polar(df, r=r, theta=theta, color=None if color == 'None' else color, title=f"Polar Bar Chart")
+
+                elif selected_plot == "Area Plot":
+                    cols = st.columns(3)
+                    x_ax = cols[0].selectbox("X-axis", all_cols, key="a_x")
+                    y_ax = cols[1].selectbox("Y-axis (Numeric)", numeric_cols, key="a_y")
+                    color = cols[2].selectbox("Color by (Categorical, Optional)", ['None'] + categorical_cols, key="a_c")
+                    if x_ax and y_ax:
+                        fig = px.area(df, x=x_ax, y=y_ax, color=None if color == 'None' else color, title=f"Area Plot of {y_ax} over {x_ax}")
+                
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("Configure the plot options above to generate a chart.")
+
+            except Exception as e:
+                st.error(f"An error occurred while generating the plot: {e}")
+                st.info("Please check your column selections. Some plots have specific requirements (e.g., numeric vs. categorical data).")
 
         elif selected_eda == "⚙️ Dimensionality Reduction":
             st.subheader("⚙️ Dimensionality Reduction Insights (PCA)")

@@ -5,6 +5,7 @@ statsmodels
 pandas
 numpy
 plotly
+WordCloud
 seaborn
 matplotlib
 scipy

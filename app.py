@@ -910,119 +910,182 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 st.plotly_chart(fig, use_container_width=True)
         
         elif selected_eda == "📈 Distribution Analysis":
-            st.markdown("### 📊 Distribution Analysis of Numeric Features")
-            st.markdown("Explore the distribution, central tendency, and spread of your numeric columns. Includes histograms, box plots, and normality tests.")
-
+            st.markdown("### 📊 Distribution Analysis Dashboard")
+            st.markdown("An interactive dashboard to explore the distribution, central tendency, and spread of a numeric column.")
+            
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             if not numeric_cols:
-                st.warning("No numeric columns found!")
+                st.warning("No numeric columns found for this analysis.")
             else:
-                selected_col = st.selectbox("Select Column", numeric_cols)
+                selected_col = st.selectbox("Select a Numeric Column to Analyze", numeric_cols)
                 
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Histogram
-                    fig = px.histogram(df, x=selected_col, nbins=50, title=f"Distribution of {selected_col}", marginal="box", opacity=0.8)
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    # Box plot
-                    fig = px.box(df, y=selected_col, title=f"Box Plot of {selected_col}", points="all")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Statistical tests
-                st.subheader("📊 Statistical Tests")
                 col_data = df[selected_col].dropna()
-                if len(col_data) > 1:
-                    col_a, col_b, col_c, col_d = st.columns(4)
-                    with col_a:
-                        st.metric("Skewness", f"{stats.skew(col_data):.3f}")
-                    with col_b:
-                        st.metric("Kurtosis", f"{stats.kurtosis(col_data):.3f}")
-                    
-                    if len(col_data) >= 3: # Shapiro-Wilk needs at least 3 samples
-                        shapiro_stat, shapiro_p = stats.shapiro(col_data.sample(min(5000, len(col_data))))
-                        with col_c:
-                            st.metric("Shapiro-Wilk (p)", f"{shapiro_p:.4f}")
-                            if shapiro_p > 0.05:
-                                st.caption("Likely Gaussian")
-                            else:
-                                st.caption("Likely Non-Gaussian")
-                    else:
-                        with col_c:
-                            st.info("Shapiro-Wilk: Needs >2 samples.")
 
-                    if len(col_data) >= 20: # D'Agostino's K^2 test needs at least 20 samples
-                        k2_stat, k2_p = stats.normaltest(col_data)
-                        with col_d:
-                            st.metric("D'Agostino K² (p)", f"{k2_p:.4f}")
-                            if k2_p > 0.05:
-                                st.caption("Likely Gaussian")
-                            else:
-                                st.caption("Likely Non-Gaussian")
-                    else:
-                        with col_d:
-                            st.info("D'Agostino K²: Needs >19 samples.")
+                # --- Top Row: Key Metrics ---
+                st.markdown("#### Key Statistical Metrics")
+                metric_cols = st.columns(5)
+                metric_cols[0].metric("Mean", f"{col_data.mean():.2f}")
+                metric_cols[1].metric("Median", f"{col_data.median():.2f}")
+                metric_cols[2].metric("Std. Dev.", f"{col_data.std():.2f}")
+                metric_cols[3].metric("Skewness", f"{col_data.skew():.2f}")
+                metric_cols[4].metric("Kurtosis", f"{col_data.kurtosis():.2f}")
+                
+                st.markdown("---")
 
-                    st.markdown("#### Quantile-Quantile (QQ) Plot")
+                # --- Main Dashboard Layout ---
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown("##### Distribution (Histogram & KDE)")
+                    # Histogram with KDE
+                    fig_hist = px.histogram(col_data, x=selected_col, nbins=50, title=f"Distribution of {selected_col}", marginal="rug", opacity=0.7, histnorm='probability density')
+                    # Add KDE trace using seaborn and plotly
+                    kde_data = sns.kdeplot(col_data).get_lines()[0].get_data()
+                    plt.clf() # clear seaborn plot
+                    fig_hist.add_trace(go.Scatter(x=kde_data[0], y=kde_data[1], mode='lines', name='KDE', line=dict(color='red', width=2)))
+                    st.plotly_chart(fig_hist, use_container_width=True)
+
+                    st.markdown("##### Box & Violin Plot")
+                    fig_box = px.violin(col_data, y=selected_col, title=f"Violin and Box Plot of {selected_col}", box=True, points="all")
+                    st.plotly_chart(fig_box, use_container_width=True)
+
+                with col2:
+                    st.markdown("##### Normality Analysis (QQ Plot)")
+                    # QQ Plot
                     fig_qq = go.Figure()
                     qq_data = stats.probplot(col_data, dist="norm", plot=None) # Get data for plot
                     fig_qq.add_trace(go.Scatter(x=qq_data[0][0], y=qq_data[0][1], mode='markers', name='Ordered Values'))
                     fig_qq.add_trace(go.Scatter(x=qq_data[0][0], y=qq_data[1][0]*qq_data[0][0] + qq_data[1][1], mode='lines', name='Fit Line', line=dict(color='red')))
                     fig_qq.update_layout(title=f'QQ Plot for {selected_col}', xaxis_title='Theoretical Quantiles', yaxis_title='Sample Quantiles')
                     st.plotly_chart(fig_qq, use_container_width=True)
-
-                else:
-                    st.warning(f"Not enough data in '{selected_col}' for detailed statistical tests.")
+                    
+                    st.markdown("##### Normality Tests")
+                    if len(col_data) >= 3:
+                        shapiro_stat, shapiro_p = stats.shapiro(col_data.sample(min(5000, len(col_data))))
+                        st.metric("Shapiro-Wilk Test (p-value)", f"{shapiro_p:.4f}", help="Tests if data is from a normal distribution. p > 0.05 suggests normality.")
+                        if shapiro_p > 0.05:
+                            st.success("The data appears to be normally distributed.")
+                        else:
+                            st.warning("The data does not appear to be normally distributed.")
+                    else:
+                        st.info("Not enough data for Shapiro-Wilk test (requires > 2 samples).")
         
         elif selected_eda == "🔗 Correlation Analysis":
+            st.markdown("### 🔗 Correlation Analysis Dashboard")
+            st.markdown("Explore relationships between numeric variables using a heatmap and an interactive network graph.")
             numeric_cols = df.select_dtypes(include=[np.number]).columns
             if len(numeric_cols) < 2:
                 st.warning("Need at least 2 numeric columns for correlation analysis!")
             else:
                 corr_matrix = df[numeric_cols].corr()
                 
-                # Correlation heatmap
-                fig = px.imshow(corr_matrix, 
-                              title="Correlation Matrix",
-                              color_continuous_scale="RdBu_r", # Reversed RdBu for intuitive positive/negative
-                              aspect="auto")
-                st.plotly_chart(fig, use_container_width=True)
+                col1, col2 = st.columns([2, 3])
+
+                with col1:
+                    st.markdown("##### Correlation Table")
+                    st.dataframe(corr_matrix)
+                    
+                    st.markdown("##### Strongest Correlations")
+                    # Unstack the correlation matrix and find the strongest correlations
+                    corr_unstacked = corr_matrix.unstack().sort_values(ascending=False)
+                    corr_unstacked = corr_unstacked[corr_unstacked != 1.0] # Remove self-correlations
+                    strongest_corr = corr_unstacked.drop_duplicates().head(10)
+                    st.dataframe(strongest_corr.to_frame(name='Correlation'))
+
+                with col2:
+                    st.markdown("##### Correlation Heatmap")
+                    fig_heatmap = px.imshow(corr_matrix, 
+                                            title="Correlation Matrix of Numeric Columns",
+                                            color_continuous_scale="RdBu_r",
+                                            zmin=-1, zmax=1,
+                                            text_auto=".2f",
+                                            aspect="auto")
+                    fig_heatmap.update_traces(textfont_size=10)
+                    st.plotly_chart(fig_heatmap, use_container_width=True)
+
+                st.markdown("---")
+                st.markdown("### 🌐 Advanced: Correlation Network Graph")
+                st.info("This graph visualizes correlations as a network. Nodes are variables, and edges represent the strength of the correlation between them. Thicker, brighter lines indicate stronger correlations.")
                 
-                # Strong correlations
-                st.subheader("🎯 Strong Correlations (|r| > 0.7)")
-                strong_corr = []
+                corr_threshold = st.slider("Correlation Threshold for Network", 0.1, 1.0, 0.5, 0.05)
+
+                # Create network graph data
+                nodes = list(corr_matrix.columns)
+                edges = []
                 for i in range(len(corr_matrix.columns)):
-                    for j in range(i+1, len(corr_matrix.columns)):
+                    for j in range(i + 1, len(corr_matrix.columns)):
                         corr_val = corr_matrix.iloc[i, j]
-                        if abs(corr_val) > 0.7:
-                            strong_corr.append({
-                                'Variable 1': corr_matrix.columns[i],
-                                'Variable 2': corr_matrix.columns[j],
-                                'Correlation': corr_val
-                            })
+                        if abs(corr_val) >= corr_threshold:
+                            edges.append((corr_matrix.columns[i], corr_matrix.columns[j], corr_val))
                 
-                if strong_corr:
-                    strong_corr_df = pd.DataFrame(strong_corr)
-                    st.dataframe(strong_corr_df)
+                if not edges:
+                    st.warning("No correlations found above the selected threshold. Try lowering the threshold.")
                 else:
-                    st.info("No strong correlations found.")
+                    # Create node positions (simple circular layout)
+                    num_nodes = len(nodes)
+                    angle = 2 * np.pi / num_nodes
+                    node_x = [np.cos(i * angle) for i in range(num_nodes)]
+                    node_y = [np.sin(i * angle) for i in range(num_nodes)]
 
-                st.markdown("#### Pairwise Scatter Plots for Highly Correlated Variables")
-                if strong_corr:
-                    num_pair_plots = st.slider("Number of Pair Plots to Show", 1, min(5, len(strong_corr)), min(3, len(strong_corr)), key="corr_pair_plots")
-                    for i in range(num_pair_plots):
-                        var1 = strong_corr[i]['Variable 1']
-                        var2 = strong_corr[i]['Variable 2']
-                        fig_pair_scatter = px.scatter(df, x=var1, y=var2, title=f"{var1} vs {var2} (Correlation: {strong_corr[i]['Correlation']:.2f})",
-                                                      marginal_x="histogram", marginal_y="histogram", trendline="ols")
-                        st.plotly_chart(fig_pair_scatter, use_container_width=True)
-                else:
-                    st.info("No strong correlations to generate pair plots.")
+                    # Create edge traces
+                    edge_traces = []
+                    for edge in edges:
+                        node1, node2, weight = edge
+                        x0, y0 = node_x[nodes.index(node1)], node_y[nodes.index(node1)]
+                        x1, y1 = node_x[nodes.index(node2)], node_y[nodes.index(node2)]
+                        
+                        color = 'red' if weight > 0 else 'blue'
+                        width = 1 + (abs(weight) - corr_threshold) * 10 # Scale width
+                        
+                        edge_traces.append(go.Scatter(
+                            x=[x0, x1, None], y=[y0, y1, None],
+                            line=dict(width=width, color=color),
+                            hoverinfo='text',
+                            text=f'{node1} - {node2}<br>Corr: {weight:.2f}',
+                            mode='lines'))
 
+                    # Create node trace
+                    node_trace = go.Scatter(
+                        x=node_x, y=node_y,
+                        mode='markers+text',
+                        text=nodes,
+                        textposition="bottom center",
+                        hoverinfo='text',
+                        textfont=dict(size=12),
+                        marker=dict(
+                            showscale=False,
+                            colorscale='YlGnBu',
+                            reversescale=True,
+                            color=[],
+                            size=20,
+                            line_width=2))
 
-        
+                    # Create figure
+                    fig_network = go.Figure(data=edge_traces + [node_trace],
+                                 layout=go.Layout(
+                                    title='Correlation Network Graph',
+                                    titlefont_size=16,
+                                    showlegend=False,
+                                    hovermode='closest',
+                                    margin=dict(b=20,l=5,r=5,t=40),
+                                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                                    )
+                    st.plotly_chart(fig_network, use_container_width=True)
+
+                # Keep the pairwise scatter plots as an optional, expandable section
+                with st.expander("#### Pairwise Scatter Plots for Highly Correlated Variables"):
+                    strong_corr_list = [(edge[0], edge[1], edge[2]) for edge in edges if abs(edge[2]) > 0.7]
+                    if strong_corr_list:
+                        num_pair_plots = st.slider("Number of Pair Plots to Show", 1, min(5, len(strong_corr_list)), min(3, len(strong_corr_list)), key="corr_pair_plots")
+                        for i in range(num_pair_plots):
+                            var1, var2, corr_val = strong_corr_list[i]
+                            fig_pair_scatter = px.scatter(df, x=var1, y=var2, title=f"{var1} vs {var2} (Correlation: {corr_val:.2f})",
+                                                          marginal_x="histogram", marginal_y="histogram", trendline="ols")
+                            st.plotly_chart(fig_pair_scatter, use_container_width=True)
+                    else:
+                        st.info("No strong correlations (|r| > 0.7) to generate pair plots.")
+
         elif selected_eda == "🎯 Outlier Detection":
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             if not numeric_cols:
@@ -1117,32 +1180,60 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                 st.plotly_chart(fig, use_container_width=True)
         
         elif selected_eda == "🏷️ Categorical Analysis":
+            st.markdown("### 🏷️ Categorical Analysis Dashboard")
+            st.markdown("An interactive dashboard to explore categorical columns.")
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
             if not categorical_cols:
-                st.warning("No categorical columns found!")
+                st.warning("No categorical columns found for this analysis.")
             else:
-                selected_col = st.selectbox("Select Categorical Column", categorical_cols)
+                selected_col = st.selectbox("Select a Categorical Column to Analyze", categorical_cols)
                 
                 value_counts = df[selected_col].value_counts()
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.subheader(f"📊 Top 10 Values in {selected_col}")
-                    st.dataframe(value_counts.head(10))
-                    
-                    st.metric("Unique Values", df[selected_col].nunique())
-                    st.metric("Most Frequent", value_counts.index[0])
-                    st.metric("Mode Frequency", value_counts.iloc[0])
-                
-                with col2:
-                    # Bar chart
-                    fig = px.bar(x=value_counts.head(10).index, 
-                               y=value_counts.head(10).values,
-                               title=f"Top 10 Values in {selected_col}")
-                    st.plotly_chart(fig, use_container_width=True)
+                top_n = st.slider("Select Top N categories to display", 1, min(50, len(value_counts)), min(10, len(value_counts)), key="cat_top_n")
+                value_counts_top_n = value_counts.head(top_n)
 
-                st.markdown("#### Cross-Tabulation & Chi-squared Test")
+                # --- Top Row: Key Metrics ---
+                st.markdown("#### Key Categorical Metrics")
+                metric_cols = st.columns(4)
+                metric_cols[0].metric("Total Categories", f"{len(value_counts):,}")
+                metric_cols[1].metric("Most Frequent (Mode)", f"{value_counts.index[0]}")
+                metric_cols[2].metric("Mode Frequency", f"{value_counts.iloc[0]:,}")
+                metric_cols[3].metric("Mode Percentage", f"{value_counts.iloc[0] / len(df) * 100:.1f}%")
+
+                st.markdown("---")
+                
+                # --- Main Dashboard Layout ---
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    st.markdown(f"##### Top {top_n} Categories Visualization")
+                    plot_type = st.radio("Select Plot Type", ["Bar Chart", "Donut Chart", "Treemap"], horizontal=True, key="cat_plot_type")
+                    
+                    if plot_type == "Bar Chart":
+                        fig = px.bar(value_counts_top_n, x=value_counts_top_n.index, y=value_counts_top_n.values,
+                                     labels={'x': selected_col, 'y': 'Count'}, title=f"Top {top_n} Value Counts for {selected_col}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    elif plot_type == "Donut Chart":
+                        fig = px.pie(value_counts_top_n, names=value_counts_top_n.index, values=value_counts_top_n.values,
+                                     title=f"Top {top_n} Value Counts for {selected_col}", hole=0.4)
+                        st.plotly_chart(fig, use_container_width=True)
+                    elif plot_type == "Treemap":
+                        treemap_df = value_counts_top_n.reset_index()
+                        treemap_df.columns = ['category', 'count']
+                        treemap_df['parent'] = selected_col # A single parent for all categories
+                        fig = px.treemap(treemap_df, path=['parent', 'category'], values='count',
+                                         title=f"Treemap of Top {top_n} Categories in {selected_col}",
+                                         color='count', color_continuous_scale='Blues')
+                        fig.update_traces(root_color="lightgrey")
+                        fig.update_layout(margin = dict(t=50, l=25, r=25, b=25))
+                        st.plotly_chart(fig, use_container_width=True)
+
+                with col2:
+                    st.markdown("##### Frequency Table")
+                    st.dataframe(value_counts_top_n.to_frame())
+
+                st.markdown("---")
+                st.markdown("#### Bivariate Analysis: Cross-Tabulation & Chi-squared Test")
                 if len(categorical_cols) >= 2:
                     cat_col_1 = st.selectbox("Select first categorical column for Chi² test", categorical_cols, key="cat_chi2_1")
                     cat_col_2 = st.selectbox("Select second categorical column for Chi² test", [c for c in categorical_cols if c != cat_col_1], key="cat_chi2_2")
@@ -1156,7 +1247,6 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         st.caption("Low p-value (<0.05) suggests a significant association between the two variables.")
                 else:
                     st.info("Need at least two categorical columns for Chi-squared test.")
-                    st.plotly_chart(fig, use_container_width=True)
         
         elif selected_eda == "⏰ Time Series Analysis":
             # Detect potential time columns

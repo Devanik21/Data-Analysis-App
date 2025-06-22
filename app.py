@@ -3233,19 +3233,23 @@ Keep the summary clear, concise, and use markdown for formatting.
 
         elif selected_ai_task == "📊 Natural Language to Chart":
             st.subheader("📊 Natural Language to Chart")
-            st.info("Describe the chart you want to create. For example: 'a scatter plot of column A vs column B, colored by column C'")
+            st.info("Describe the chart you want to create. For example: 'a scatter plot of column A vs column B, colored by column C'. The AI will attempt to fix its own code if it fails.")
             
-            chart_request = st.text_area("Your chart request:", placeholder="e.g., 'a bar chart showing the average income per city'")
+            if 'chart_request' not in st.session_state:
+                st.session_state.chart_request = "a bar chart showing the average income per city"
+            
+            chart_request = st.text_area("Your chart request:", key="chart_request")
             
             if st.button("Generate Chart", type="primary"):
                 if chart_request:
-                    # Get schema for the prompt
-                    schema = pd.DataFrame({
-                        'Column': df.columns,
-                        'DataType': df.dtypes.astype(str)
-                    }).to_string()
+                    with st.spinner("Generating initial code..."):
+                        # Get schema for the prompt
+                        schema = pd.DataFrame({
+                            'Column': df.columns,
+                            'DataType': df.dtypes.astype(str)
+                        }).to_string()
 
-                    prompt = f"""
+                        initial_prompt = f"""
 You are an expert Python data visualization specialist who uses the plotly.express library.
 Given a pandas DataFrame named `df` with the following schema:
 {schema}
@@ -3253,18 +3257,20 @@ Given a pandas DataFrame named `df` with the following schema:
 And a small sample of the data:
 {df.head().to_string()}
 
-Write Python code using `plotly.express` (as px) to generate a chart that fulfills the following user request:
+Write Python code using `plotly.express` (as px) to generate a chart that fulfills the following user request.
 "{chart_request}"
 
-Your code should:
+Your code MUST:
 1.  Import `plotly.express` as `px`.
 2.  Create a single figure object and assign it to a variable named `fig`.
 3.  Do NOT use `fig.show()` or `st.plotly_chart()`.
-4.  Provide only the Python code in a single code block, without any explanation or surrounding text.
-5.  If a column needs to be converted (e.g., to numeric or datetime), include that in the code.
+4.  Provide ONLY the Python code in a single code block, without any explanation or surrounding text.
+5.  Before plotting, ensure the necessary columns are of the correct data type (e.g., using `pd.to_numeric` or `pd.to_datetime`). Handle potential errors in conversion (e.g., `errors='coerce'`).
+6.  Handle potential missing values in the columns used for plotting (e.g., by using `.dropna()`). This is very important.
 """
+                        
+                        generated_code = generate_gemini_content(initial_prompt)
                     
-                    generated_code = generate_gemini_content(prompt)
                     if generated_code:
                         # Clean up the response to get only the code block
                         cleaned_code = re.sub(r"```(python)?\n", "", generated_code)
@@ -3276,28 +3282,54 @@ Your code should:
                         st.subheader("Generated Chart")
                         st.warning("⚠️ Executing AI-generated code. Review the code for safety before running in production.")
                         
-                        try:
-                            # Create a safe execution environment
-                            exec_globals = {
-                                'df': df.copy(),
-                                'pd': pd,
-                                'px': px,
-                                'go': go,
-                                'np': np
-                            }
-                            
-                            # Execute code
-                            exec(cleaned_code, exec_globals)
-                            
-                            # Capture the figure
-                            if 'fig' in exec_globals and isinstance(exec_globals['fig'], go.Figure):
-                                fig = exec_globals['fig']
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.error("The generated code did not produce a valid Plotly figure object named 'fig'.")
-                        
-                        except Exception as e:
-                            st.error(f"Error executing generated code: {e}")
+                        max_retries = 1
+                        for attempt in range(max_retries + 1):
+                            try:
+                                # Create a safe execution environment
+                                exec_globals = {
+                                    'df': df.copy(),
+                                    'pd': pd,
+                                    'px': px,
+                                    'go': go,
+                                    'np': np,
+                                    'nan': np.nan # Fix for 'nan' is not defined error
+                                }
+                                
+                                # Execute code
+                                exec(cleaned_code, exec_globals)
+                                
+                                # Capture the figure
+                                if 'fig' in exec_globals and isinstance(exec_globals['fig'], go.Figure):
+                                    fig = exec_globals['fig']
+                                    st.plotly_chart(fig, use_container_width=True)
+                                    st.success("Chart generated successfully!")
+                                    break # Success, exit the loop
+                                else:
+                                    # This is a logical error, not a syntax/runtime one. We'll trigger a retry.
+                                    raise ValueError("The generated code did not create a 'fig' variable of type go.Figure.")
+
+                            except Exception as e:
+                                st.error(f"Attempt {attempt + 1} failed: {e}")
+                                if attempt < max_retries:
+                                    st.info("🤖 The code failed. Asking Gemini for a fix...")
+                                    with st.spinner("Attempting to self-correct the code..."):
+                                        fix_prompt = f"""You are a Python debugging expert. The following code, intended to generate a Plotly chart, failed with an error.
+Original user request: "{chart_request}"
+Faulty Code:\n```python\n{cleaned_code}\n```\nError Message:\n```\n{e}\n```
+Please fix the code. Your response should only contain the corrected Python code in a single code block. Do not add any explanation. Ensure the corrected code defines a plotly figure named `fig`."""
+                                        corrected_code_response = generate_gemini_content(fix_prompt)
+                                        if corrected_code_response:
+                                            cleaned_code = re.sub(r"```(python)?\n", "", corrected_code_response)
+                                            cleaned_code = re.sub(r"```", "", cleaned_code).strip()
+                                            st.subheader(f"Corrected Code (Attempt {attempt + 2})")
+                                            st.code(cleaned_code, language='python')
+                                        else:
+                                            st.error("Could not get a fix from Gemini. Stopping.")
+                                            break # Break if Gemini fails to provide a fix
+                                else:
+                                    st.error("Failed to generate a working chart after retries.")
+                    else:
+                        st.error("Failed to generate code from the initial prompt.")
                 else:
                     st.warning("Please enter a chart request.")
 

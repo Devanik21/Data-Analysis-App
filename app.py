@@ -2668,103 +2668,102 @@ elif selected_tool == "💼 Power BI Dashboard":
 
             if filtered_df.empty:
                 st.warning("No data matches the current filter settings.")
-                return
+            else:
+                # --- KPIs ---
+                st.subheader("Key Performance Indicators")
+                kpi_cols = st.columns(4)
+                kpi_cols[0].metric("Filtered Records", f"{len(filtered_df):,}", f"{len(filtered_df)/len(df):.1%} of total")
+                if numeric_cols: kpi_cols[1].metric(f"Avg. {numeric_cols[0]}", f"{filtered_df[numeric_cols[0]].mean():,.2f}")
+                if len(numeric_cols) > 1: kpi_cols[2].metric(f"Total {numeric_cols[1]}", f"{filtered_df[numeric_cols[1]].sum():,.2f}")
+                if categorical_cols: kpi_cols[3].metric(f"Unique {categorical_cols[0]}", f"{filtered_df[categorical_cols[0]].nunique():,}")
 
-            # --- KPIs ---
-            st.subheader("Key Performance Indicators")
-            kpi_cols = st.columns(4)
-            kpi_cols[0].metric("Filtered Records", f"{len(filtered_df):,}", f"{len(filtered_df)/len(df):.1%} of total")
-            if numeric_cols: kpi_cols[1].metric(f"Avg. {numeric_cols[0]}", f"{filtered_df[numeric_cols[0]].mean():,.2f}")
-            if len(numeric_cols) > 1: kpi_cols[2].metric(f"Total {numeric_cols[1]}", f"{filtered_df[numeric_cols[1]].sum():,.2f}")
-            if categorical_cols: kpi_cols[3].metric(f"Unique {categorical_cols[0]}", f"{filtered_df[categorical_cols[0]].nunique():,}")
+                st.markdown("---")
+                st.markdown("### 📊 Row 1: Overview & Geospatial Insights")
+                row1_cols = st.columns(3)
+                with row1_cols[0]:
+                    if date_cols and numeric_cols:
+                        time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index()
+                        fig = px.line(time_df, x=date_cols[0], y=numeric_cols[0], title=f"Monthly Avg of {numeric_cols[0]}", markers=True)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Time series plot requires a date and a numeric column.")
+                with row1_cols[1]:
+                    if categorical_cols and numeric_cols:
+                        bar_df = filtered_df.groupby(categorical_cols[0])[numeric_cols[0]].mean().sort_values(ascending=False).reset_index().head(10)
+                        fig = px.bar(bar_df, x=categorical_cols[0], y=numeric_cols[0], title=f"Top 10 Avg {numeric_cols[0]} by {categorical_cols[0]}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Bar chart requires a categorical and a numeric column.")
+                with row1_cols[2]:
+                    if lat_col and lon_col and numeric_cols:
+                        fig = px.scatter_mapbox(filtered_df.dropna(subset=[lat_col, lon_col]), lat=lat_col, lon=lon_col, color=numeric_cols[0],
+                                                size=numeric_cols[0] if filtered_df[numeric_cols[0]].min() > 0 else None,
+                                                mapbox_style="carto-positron", zoom=1, title="Geospatial Distribution")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Geospatial plot requires lat/lon columns.")
 
-            st.markdown("---")
-            st.markdown("### 📊 Row 1: Overview & Geospatial Insights")
-            row1_cols = st.columns(3)
-            with row1_cols[0]:
-                if date_cols and numeric_cols:
-                    time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index()
-                    fig = px.line(time_df, x=date_cols[0], y=numeric_cols[0], title=f"Monthly Avg of {numeric_cols[0]}", markers=True)
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Time series plot requires a date and a numeric column.")
-            with row1_cols[1]:
-                if categorical_cols and numeric_cols:
-                    bar_df = filtered_df.groupby(categorical_cols[0])[numeric_cols[0]].mean().sort_values(ascending=False).reset_index().head(10)
-                    fig = px.bar(bar_df, x=categorical_cols[0], y=numeric_cols[0], title=f"Top 10 Avg {numeric_cols[0]} by {categorical_cols[0]}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Bar chart requires a categorical and a numeric column.")
-            with row1_cols[2]:
-                if lat_col and lon_col and numeric_cols:
-                    fig = px.scatter_mapbox(filtered_df.dropna(subset=[lat_col, lon_col]), lat=lat_col, lon=lon_col, color=numeric_cols[0],
-                                            size=numeric_cols[0] if filtered_df[numeric_cols[0]].min() > 0 else None,
-                                            mapbox_style="carto-positron", zoom=1, title="Geospatial Distribution")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Geospatial plot requires lat/lon columns.")
+                st.markdown("---")
+                st.markdown("### 📈 Row 2: Distribution & Outlier Analysis")
+                row2_cols = st.columns(3)
+                with row2_cols[0]:
+                    if numeric_cols:
+                        fig = px.histogram(filtered_df, x=numeric_cols[0], marginal="box", title=f"Distribution of {numeric_cols[0]}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Histogram requires a numeric column.")
+                with row2_cols[1]:
+                    if len(numeric_cols) > 1:
+                        fig = px.box(filtered_df, y=numeric_cols[:min(5, len(numeric_cols))], title="Box Plots of Numeric Columns")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Box plots require at least two numeric columns.")
+                with row2_cols[2]:
+                    if numeric_cols and categorical_cols:
+                        fig = px.violin(filtered_df, y=numeric_cols[0], x=categorical_cols[0], color=categorical_cols[0], box=True, title=f"Distribution of {numeric_cols[0]} by {categorical_cols[0]}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Violin plot requires a numeric and a categorical column.")
 
-            st.markdown("---")
-            st.markdown("### 📈 Row 2: Distribution & Outlier Analysis")
-            row2_cols = st.columns(3)
-            with row2_cols[0]:
-                if numeric_cols:
-                    fig = px.histogram(filtered_df, x=numeric_cols[0], marginal="box", title=f"Distribution of {numeric_cols[0]}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Histogram requires a numeric column.")
-            with row2_cols[1]:
+                st.markdown("---")
+                st.markdown("### 🔗 Row 3: Relationship Analysis")
+                row3_cols = st.columns(2)
+                with row3_cols[0]:
+                    if len(numeric_cols) > 1:
+                        corr = filtered_df[numeric_cols].corr()
+                        fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', title="Correlation Heatmap")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Correlation heatmap requires at least two numeric columns.")
+                with row3_cols[1]:
+                    if len(numeric_cols) > 1:
+                        color_opt = categorical_cols[0] if categorical_cols else None
+                        fig = px.scatter(filtered_df, x=numeric_cols[0], y=numeric_cols[1], color=color_opt,
+                                         trendline="ols", title=f"Scatter Plot: {numeric_cols[0]} vs {numeric_cols[1]}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Scatter plot requires at least two numeric columns.")
+                
                 if len(numeric_cols) > 1:
-                    fig = px.box(filtered_df, y=numeric_cols[:min(5, len(numeric_cols))], title="Box Plots of Numeric Columns")
+                    st.markdown("##### 2D Density Contour")
+                    fig = px.density_contour(filtered_df, x=numeric_cols[0], y=numeric_cols[1], title=f"2D Density of {numeric_cols[0]} and {numeric_cols[1]}")
                     st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Box plots require at least two numeric columns.")
-            with row2_cols[2]:
-                if numeric_cols and categorical_cols:
-                    fig = px.violin(filtered_df, y=numeric_cols[0], x=categorical_cols[0], color=categorical_cols[0], box=True, title=f"Distribution of {numeric_cols[0]} by {categorical_cols[0]}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Violin plot requires a numeric and a categorical column.")
 
-            st.markdown("---")
-            st.markdown("### 🔗 Row 3: Relationship Analysis")
-            row3_cols = st.columns(2)
-            with row3_cols[0]:
-                if len(numeric_cols) > 1:
-                    corr = filtered_df[numeric_cols].corr()
-                    fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', title="Correlation Heatmap")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Correlation heatmap requires at least two numeric columns.")
-            with row3_cols[1]:
-                if len(numeric_cols) > 1:
-                    color_opt = categorical_cols[0] if categorical_cols else None
-                    fig = px.scatter(filtered_df, x=numeric_cols[0], y=numeric_cols[1], color=color_opt,
-                                     trendline="ols", title=f"Scatter Plot: {numeric_cols[0]} vs {numeric_cols[1]}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Scatter plot requires at least two numeric columns.")
-            
-            if len(numeric_cols) > 1:
-                st.markdown("##### 2D Density Contour")
-                fig = px.density_contour(filtered_df, x=numeric_cols[0], y=numeric_cols[1], title=f"2D Density of {numeric_cols[0]} and {numeric_cols[1]}")
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("---")
-            st.markdown("### 🧩 Row 4: Categorical & Compositional Analysis")
-            row4_cols = st.columns(3)
-            with row4_cols[0]:
-                if len(categorical_cols) > 1 and numeric_cols:
-                    fig = px.treemap(filtered_df, path=[px.Constant("All"), categorical_cols[0], categorical_cols[1]], values=numeric_cols[0],
-                                     title=f"Treemap of {numeric_cols[0]} by {categorical_cols[0]} and {categorical_cols[1]}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Treemap requires at least two categorical and one numeric column.")
-            with row4_cols[1]:
-                if categorical_cols:
-                    cat_col_pie = next((c for c in categorical_cols if 1 < filtered_df[c].nunique() < 10), categorical_cols[0])
-                    counts = filtered_df[cat_col_pie].value_counts()
-                    fig = px.pie(counts, values=counts.values, names=counts.index, title=f"Breakdown by {cat_col_pie}", hole=0.4)
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Pie chart requires a categorical column.")
-            with row4_cols[2]:
-                if len(categorical_cols) > 1 and numeric_cols:
-                    stacked_df = filtered_df.groupby([categorical_cols[0], categorical_cols[1]])[numeric_cols[0]].sum().reset_index()
-                    fig = px.bar(stacked_df, x=categorical_cols[0], y=numeric_cols[0], color=categorical_cols[1],
-                                 title=f"Stacked Bar: Sum of {numeric_cols[0]} by Categories")
-                    st.plotly_chart(fig, use_container_width=True)
-                else: st.info("Stacked bar chart requires at least two categorical and one numeric column.")
+                st.markdown("---")
+                st.markdown("### 🧩 Row 4: Categorical & Compositional Analysis")
+                row4_cols = st.columns(3)
+                with row4_cols[0]:
+                    if len(categorical_cols) > 1 and numeric_cols:
+                        fig = px.treemap(filtered_df, path=[px.Constant("All"), categorical_cols[0], categorical_cols[1]], values=numeric_cols[0],
+                                         title=f"Treemap of {numeric_cols[0]} by {categorical_cols[0]} and {categorical_cols[1]}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Treemap requires at least two categorical and one numeric column.")
+                with row4_cols[1]:
+                    if categorical_cols:
+                        cat_col_pie = next((c for c in categorical_cols if 1 < filtered_df[c].nunique() < 10), categorical_cols[0])
+                        counts = filtered_df[cat_col_pie].value_counts()
+                        fig = px.pie(counts, values=counts.values, names=counts.index, title=f"Breakdown by {cat_col_pie}", hole=0.4)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Pie chart requires a categorical column.")
+                with row4_cols[2]:
+                    if len(categorical_cols) > 1 and numeric_cols:
+                        stacked_df = filtered_df.groupby([categorical_cols[0], categorical_cols[1]])[numeric_cols[0]].sum().reset_index()
+                        fig = px.bar(stacked_df, x=categorical_cols[0], y=numeric_cols[0], color=categorical_cols[1],
+                                     title=f"Stacked Bar: Sum of {numeric_cols[0]} by Categories")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info("Stacked bar chart requires at least two categorical and one numeric column.")
 
         except Exception as e:
             st.error(f"An error occurred while generating the dashboard: {e}")

@@ -3049,40 +3049,96 @@ elif selected_tool == "💼 Power BI Dashboard":
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
-        try:
-            # --- Column Selection for Plots ---
-            numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            date_cols = df.select_dtypes(include=['datetime64', 'datetime64[ns]']).columns.tolist()
-            # Basic lat/lon detection
-            lat_col = next((c for c in df.columns if 'lat' in c.lower()), None)
-            lon_col = next((c for c in df.columns if 'lon' in c.lower() or 'lng' in c.lower()), None)
+        
+        # Initialize dashboard state with some sensible defaults if possible
+        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        date_cols = df.select_dtypes(include=['datetime64', 'datetime64[ns]']).columns.tolist()
+        all_cols = df.columns.tolist()
 
-            px.defaults.template = "plotly_white" # Set a clean theme
+        if 'bi_dashboard_config' not in st.session_state:
+            st.session_state.bi_dashboard_config = {
+                'chart1': {
+                    'type': 'Bar', 
+                    'x': categorical_cols[0] if categorical_cols else None, 
+                    'y': numeric_cols[0] if numeric_cols else None, 
+                    'color': None, 
+                    'agg': 'mean'
+                },
+                'chart2': {
+                    'type': 'Line', 
+                    'x': date_cols[0] if date_cols else (all_cols[0] if all_cols else None), 
+                    'y': numeric_cols[0] if numeric_cols else None, 
+                    'color': None
+                },
+                'chart3': {
+                    'type': 'Scatter', 
+                    'x': numeric_cols[0] if numeric_cols else None, 
+                    'y': numeric_cols[1] if len(numeric_cols) > 1 else None, 
+                    'color': categorical_cols[0] if categorical_cols else None
+                },
+                'chart4': {
+                    'type': 'Pie', 
+                    'names': categorical_cols[0] if categorical_cols else None, 
+                    'values': numeric_cols[0] if numeric_cols else None
+                },
+            }
+
+        # --- Layout: Controls on the left, Dashboard on the right ---
+        control_col, dashboard_col = st.columns([1, 3])
+
+        with control_col:
+            st.subheader("⚙️ Dashboard Controls")
             
             # --- Dashboard Filters ---
-            st.subheader(" interactivity Dashboard Filters")            
-            filtered_df = df.copy()
-
-            with st.expander("Filter Controls", expanded=True):
-                filter_cols_ui = st.columns(4)
+            with st.expander("Global Data Filters", expanded=True):
+                filtered_df = df.copy()
                 # Categorical Filters
-                for i, col in enumerate(categorical_cols[:3]): # Use up to 3 categorical filters
-                    with filter_cols_ui[i]:
-                        unique_vals = sorted(df[col].dropna().unique())
-                        selected_vals = st.multiselect(f"Filter by {col}", unique_vals, default=unique_vals, key=f"bi_filter_{col}")
-                        if selected_vals != unique_vals:
-                            filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
+                for i, col in enumerate(categorical_cols[:2]): # Use up to 2 categorical filters for space
+                    unique_vals = sorted(df[col].dropna().unique())
+                    selected_vals = st.multiselect(f"Filter by {col}", unique_vals, default=unique_vals, key=f"bi_filter_{col}")
+                    if selected_vals != unique_vals:
+                        filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
 
                 # Numeric Filter
                 if numeric_cols:
-                    with filter_cols_ui[3]:
-                        num_col_filter = st.selectbox("Filter by Numeric Column", numeric_cols, key="bi_num_filter_col")
-                        min_val, max_val = float(df[num_col_filter].min()), float(df[num_col_filter].max())
-                        if min_val < max_val:
-                            selected_range = st.slider(f"Range for {num_col_filter}", min_val, max_val, (min_val, max_val), key=f"bi_filter_slider_{num_col_filter}")
-                            filtered_df = filtered_df[filtered_df[num_col_filter].between(selected_range[0], selected_range[1])]
+                    num_col_filter = st.selectbox("Filter by Numeric Column", numeric_cols, key="bi_num_filter_col")
+                    min_val, max_val = float(df[num_col_filter].min()), float(df[num_col_filter].max())
+                    if min_val < max_val:
+                        selected_range = st.slider(f"Range for {num_col_filter}", min_val, max_val, (min_val, max_val), key=f"bi_filter_slider_{num_col_filter}")
+                        filtered_df = filtered_df[filtered_df[num_col_filter].between(selected_range[0], selected_range[1])]
+            
+            # --- Chart Configuration ---
+            st.markdown("---")
+            st.subheader("📊 Chart Configuration")
+            
+            chart_to_configure = st.selectbox("Configure Chart", ["Chart 1 (Top-Left)", "Chart 2 (Top-Right)", "Chart 3 (Bottom-Left)", "Chart 4 (Bottom-Right)"])
+            
+            chart_key_map = {
+                "Chart 1 (Top-Left)": "chart1",
+                "Chart 2 (Top-Right)": "chart2",
+                "Chart 3 (Bottom-Left)": "chart3",
+                "Chart 4 (Bottom-Right)": "chart4",
+            }
+            chart_key = chart_key_map[chart_to_configure]
+            
+            config = st.session_state.bi_dashboard_config[chart_key]
 
+            config['type'] = st.selectbox("Chart Type", ["Bar", "Line", "Scatter", "Pie", "Histogram", "Box"], key=f"{chart_key}_type", index=["Bar", "Line", "Scatter", "Pie", "Histogram", "Box"].index(config.get('type', 'Bar')))
+            
+            if config['type'] in ["Bar", "Line", "Scatter"]:
+                config['x'] = st.selectbox("X-axis", all_cols, key=f"{chart_key}_x", index=all_cols.index(config['x']) if config.get('x') in all_cols else 0)
+                config['y'] = st.selectbox("Y-axis", numeric_cols, key=f"{chart_key}_y", index=numeric_cols.index(config['y']) if config.get('y') in numeric_cols else 0)
+                config['color'] = st.selectbox("Color by (Optional)", ['None'] + all_cols, key=f"{chart_key}_color", index=(['None'] + all_cols).index(config['color']) if config.get('color') in (['None'] + all_cols) else 0)
+                if config['type'] == "Bar":
+                    config['agg'] = st.selectbox("Aggregation", ["mean", "sum", "count"], key=f"{chart_key}_agg", index=["mean", "sum", "count"].index(config.get('agg', 'mean')))
+            elif config['type'] in ["Histogram", "Box"]:
+                config['x'] = st.selectbox("Column", numeric_cols, key=f"{chart_key}_hist_x", index=numeric_cols.index(config['x']) if config.get('x') in numeric_cols else 0)
+            elif config['type'] == "Pie":
+                config['names'] = st.selectbox("Names (Categories)", categorical_cols, key=f"{chart_key}_pie_names", index=categorical_cols.index(config['names']) if config.get('names') in categorical_cols else 0)
+                config['values'] = st.selectbox("Values (Numeric)", numeric_cols, key=f"{chart_key}_pie_values", index=numeric_cols.index(config['values']) if config.get('values') in numeric_cols else 0)
+
+        with dashboard_col:
             if filtered_df.empty:
                 st.warning("No data matches the current filter settings.")
             else:
@@ -3095,96 +3151,94 @@ elif selected_tool == "💼 Power BI Dashboard":
                 if categorical_cols: kpi_cols[3].metric(f"Unique {categorical_cols[0]}", f"{filtered_df[categorical_cols[0]].nunique():,}")
 
                 st.markdown("---")
-                st.markdown("### 📊 Row 1: Overview & Geospatial Insights")
-                row1_cols = st.columns(3)
-                with row1_cols[0]:
-                    if date_cols and numeric_cols:
-                        time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index()
-                        fig = px.line(time_df, x=date_cols[0], y=numeric_cols[0], title=f"Monthly Avg of {numeric_cols[0]}", markers=True)
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Time series plot requires a date and a numeric column.")
-                with row1_cols[1]:
-                    if categorical_cols and numeric_cols:
-                        bar_df = filtered_df.groupby(categorical_cols[0])[numeric_cols[0]].mean().sort_values(ascending=False).reset_index().head(10)
-                        fig = px.bar(bar_df, x=categorical_cols[0], y=numeric_cols[0], title=f"Top 10 Avg {numeric_cols[0]} by {categorical_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Bar chart requires a categorical and a numeric column.")
-                with row1_cols[2]:
-                    if lat_col and lon_col and numeric_cols:
-                        fig = px.scatter_mapbox(filtered_df.dropna(subset=[lat_col, lon_col]), lat=lat_col, lon=lon_col, color=numeric_cols[0],
-                                                size=numeric_cols[0] if filtered_df[numeric_cols[0]].min() > 0 else None,
-                                                mapbox_style="carto-positron", zoom=1, title="Geospatial Distribution")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Geospatial plot requires lat/lon columns.")
 
-                st.markdown("---")
-                st.markdown("### 📈 Row 2: Distribution & Outlier Analysis")
-                row2_cols = st.columns(3)
-                with row2_cols[0]:
-                    if numeric_cols:
-                        fig = px.histogram(filtered_df, x=numeric_cols[0], marginal="box", title=f"Distribution of {numeric_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Histogram requires a numeric column.")
-                with row2_cols[1]:
-                    if len(numeric_cols) > 1:
-                        fig = px.box(filtered_df, y=numeric_cols[:min(5, len(numeric_cols))], title="Box Plots of Numeric Columns")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Box plots require at least two numeric columns.")
-                with row2_cols[2]:
-                    if numeric_cols and categorical_cols:
-                        fig = px.violin(filtered_df, y=numeric_cols[0], x=categorical_cols[0], color=categorical_cols[0], box=True, title=f"Distribution of {numeric_cols[0]} by {categorical_cols[0]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Violin plot requires a numeric and a categorical column.")
+                # --- AI Insights ---
+                with st.expander("🤖 Get AI Insights on Filtered Data"):
+                    if not st.session_state.gemini_model:
+                        st.warning("Enter your Google AI API Key in the sidebar to enable AI Insights.")
+                    else:
+                        if st.button("Analyze Current View"):
+                            prompt = f"""
+You are a data analyst. Based on the following sample of the currently filtered data, provide 3-4 key insights.
+The data has been filtered down to {len(filtered_df)} rows.
 
-                st.markdown("---")
-                st.markdown("### 🔗 Row 3: Relationship Analysis")
-                row3_cols = st.columns(2)
-                with row3_cols[0]:
-                    if len(numeric_cols) > 1:
-                        corr = filtered_df[numeric_cols].corr()
-                        fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', title="Correlation Heatmap")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Correlation heatmap requires at least two numeric columns.")
-                with row3_cols[1]:
-                    if len(numeric_cols) > 1:
-                        color_opt = categorical_cols[0] if categorical_cols else None
-                        fig = px.scatter(filtered_df, x=numeric_cols[0], y=numeric_cols[1], color=color_opt,
-                                         trendline="ols", title=f"Scatter Plot: {numeric_cols[0]} vs {numeric_cols[1]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Scatter plot requires at least two numeric columns.")
+Data Sample (first 10 rows):
+{filtered_df.head(10).to_string()}
+
+Describe interesting patterns, relationships, or anomalies you observe in this specific slice of data.
+Be concise and use bullet points.
+"""
+                            insights = generate_gemini_content(prompt)
+                            if insights:
+                                st.markdown(insights)
+
+                # --- Dashboard Grid ---
+                row1_cols = st.columns(2)
+                row2_cols = st.columns(2)
                 
-                if len(numeric_cols) > 1:
-                    st.markdown("##### 2D Density Contour")
-                    fig = px.density_contour(filtered_df, x=numeric_cols[0], y=numeric_cols[1], title=f"2D Density of {numeric_cols[0]} and {numeric_cols[1]}")
-                    st.plotly_chart(fig, use_container_width=True)
+                chart_containers = {
+                    'chart1': row1_cols[0],
+                    'chart2': row1_cols[1],
+                    'chart3': row2_cols[0],
+                    'chart4': row2_cols[1],
+                }
 
-                st.markdown("---")
-                st.markdown("### 🧩 Row 4: Categorical & Compositional Analysis")
-                row4_cols = st.columns(3)
-                with row4_cols[0]:
-                    if len(categorical_cols) > 1 and numeric_cols:
-                        fig = px.treemap(filtered_df, path=[px.Constant("All"), categorical_cols[0], categorical_cols[1]], values=numeric_cols[0],
-                                         title=f"Treemap of {numeric_cols[0]} by {categorical_cols[0]} and {categorical_cols[1]}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Treemap requires at least two categorical and one numeric column.")
-                with row4_cols[1]:
-                    if categorical_cols:
-                        cat_col_pie = next((c for c in categorical_cols if 1 < filtered_df[c].nunique() < 10), categorical_cols[0])
-                        counts = filtered_df[cat_col_pie].value_counts()
-                        fig = px.pie(counts, values=counts.values, names=counts.index, title=f"Breakdown by {cat_col_pie}", hole=0.4)
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Pie chart requires a categorical column.")
-                with row4_cols[2]:
-                    if len(categorical_cols) > 1 and numeric_cols:
-                        stacked_df = filtered_df.groupby([categorical_cols[0], categorical_cols[1]])[numeric_cols[0]].sum().reset_index()
-                        fig = px.bar(stacked_df, x=categorical_cols[0], y=numeric_cols[0], color=categorical_cols[1],
-                                     title=f"Stacked Bar: Sum of {numeric_cols[0]} by Categories")
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info("Stacked bar chart requires at least two categorical and one numeric column.")
+                def render_bi_chart(container, data, config):
+                    with container:
+                        try:
+                            fig = None
+                            chart_type = config.get('type')
+                            title = f"{config.get('y', '')} by {config.get('x', '')}" if config.get('x') and config.get('y') else chart_type
+                            
+                            if chart_type in ["Bar", "Line", "Scatter"]:
+                                x, y, color = config.get('x'), config.get('y'), config.get('color')
+                                if not x or not y:
+                                    st.info(f"Configure {chart_type} chart in the controls panel.")
+                                    return
+                                
+                                plot_data = data.copy()
+                                if chart_type == "Bar":
+                                    agg = config.get('agg', 'mean')
+                                    title = f"{agg.capitalize()} of {y} by {x}"
+                                    if color and color != 'None':
+                                        plot_data = plot_data.groupby([x, color], as_index=False)[y].agg(agg)
+                                    else:
+                                        plot_data = plot_data.groupby(x, as_index=False)[y].agg(agg)
+                                    fig = px.bar(plot_data, x=x, y=y, color=color if color != 'None' else None, title=title)
+                                elif chart_type == "Line":
+                                    fig = px.line(plot_data, x=x, y=y, color=color if color != 'None' else None, title=title)
+                                elif chart_type == "Scatter":
+                                    fig = px.scatter(plot_data, x=x, y=y, color=color if color != 'None' else None, title=title, trendline="ols")
 
-        except Exception as e:
-            st.error(f"An error occurred while generating the dashboard: {e}")
-            st.info("This can happen if the filtered data is empty or unsuitable for a specific plot. Try adjusting the filters.")
+                            elif chart_type in ["Histogram", "Box"]:
+                                x = config.get('x')
+                                if not x:
+                                    st.info(f"Configure {chart_type} chart in the controls panel.")
+                                    return
+                                title = f"Distribution of {x}"
+                                if chart_type == "Histogram":
+                                    fig = px.histogram(data, x=x, title=title, marginal="box")
+                                else: # Box
+                                    fig = px.box(data, y=x, title=title)
+
+                            elif chart_type == "Pie":
+                                names, values = config.get('names'), config.get('values')
+                                if not names or not values:
+                                    st.info("Configure Pie chart in the controls panel.")
+                                    return
+                                title = f"Composition of {values} by {names}"
+                                plot_data = data.groupby(names, as_index=False)[values].sum()
+                                fig = px.pie(plot_data, names=names, values=values, title=title, hole=0.4)
+
+                            if fig:
+                                fig.update_layout(margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor="#f0f2f6", plot_bgcolor="#ffffff")
+                                st.plotly_chart(fig, use_container_width=True)
+
+                        except Exception as e:
+                            st.error(f"Could not render chart: {e}")
+
+                for key, container in chart_containers.items():
+                    render_bi_chart(container, filtered_df, st.session_state.bi_dashboard_config[key])
                 
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics Engine</h2>', unsafe_allow_html=True)

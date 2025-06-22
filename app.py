@@ -208,16 +208,19 @@ def create_download_link(df: pd.DataFrame, filename: str = "data.csv") -> str:
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">Download {filename}</a>'
     return href
 
-def execute_sql_query(df: pd.DataFrame, query: str) -> tuple[Optional[pd.DataFrame], Optional[str]]:
+def execute_sql_query(df: pd.DataFrame, query: str) -> tuple[Optional[pd.DataFrame], Optional[str], float]:
     """Execute SQL query on dataframe using DuckDB for high performance."""
+    start_time = time.time()
     try:
         conn = duckdb.connect(database=':memory:')
         conn.register('data', df)
         result = conn.execute(query).fetchdf()
         conn.close()
-        return result, None
+        duration = time.time() - start_time
+        return result, None, duration
     except Exception as e:
-        return None, str(e)
+        duration = time.time() - start_time
+        return None, str(e), duration
 
 def advanced_outlier_detection(df: pd.DataFrame, column: str) -> dict:
     """Advanced outlier detection using multiple methods"""
@@ -728,124 +731,161 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
 elif selected_tool == "🔍 SQL Query Engine":
     st.markdown('<h2 class="tool-header">🔍 Advanced SQL Query Engine</h2>', unsafe_allow_html=True)
 
-    # --- SQL Query Examples ---
-    with st.expander("🧠 SQL Query Examples", expanded=False):
-        st.markdown("""
-**1. Select everything**
-```sql
-SELECT * FROM data;
-```
-**2. Filter: Male users in Tokyo**
-```sql
-SELECT * FROM data
-WHERE gender = 'Male' AND city = 'Tokyo';
-```
-**3. Total purchases per city**
-```sql
-SELECT city, SUM(purchases) AS total_purchases
-FROM data
-GROUP BY city;
-```
-**4. Average income by gender**
-```sql
-SELECT gender, AVG(income) AS avg_income
-FROM data
-GROUP BY gender;
-```
-**5. Count users with missing age**
-```sql
-SELECT COUNT(*) AS missing_ages
-FROM data
-WHERE age IS NULL;
-```
-        """)
-
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
         
-        col1, col2 = st.columns([2, 1])
+        # New layout
+        main_col, side_col = st.columns([2, 1])
         
-        with col1:
-            st.subheader("✍️ SQL Query Editor")
-            
-            # Query templates
-            templates = {
-                "Basic Select": "SELECT * FROM data LIMIT 10;",
-                "Group By": "SELECT column_name, COUNT(*) as count FROM data GROUP BY column_name;",
-                "Where Filter": "SELECT * FROM data WHERE column_name = 'value';",
-                "Join": "-- Use multiple tables if needed",
-                "Aggregate": "SELECT AVG(column_name), MAX(column_name), MIN(column_name) FROM data;",
-                "Window Functions": "SELECT *, ROW_NUMBER() OVER (ORDER BY column_name) as row_num FROM data;"
-            }
-            
-            selected_template = st.selectbox("📋 Query Templates", list(templates.keys()))
-            if st.button("Use Template"):
-                st.session_state.current_query = templates[selected_template]
-            
-            query = st.text_area(
-                "Enter SQL Query:",
-                value=st.session_state.get('current_query', 'SELECT * FROM data LIMIT 10;'),
-                height=200,
-                help="Table name is 'data'. Available columns: " + ", ".join(df.columns.tolist())
-            )
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("🚀 Execute Query", type="primary"):
-                    result, error = execute_sql_query(df, query)
-                    if error:
-                        st.error(f"SQL Error: {error}")
+        with side_col:
+            st.subheader("🛠️ Tools & Info")
+
+            # Schema Viewer
+            with st.expander("📄 Table Schema (`data`)", expanded=True):
+                schema_info = pd.DataFrame({
+                    'Column': df.columns,
+                    'Type': df.dtypes.astype(str)
+                })
+                st.dataframe(schema_info, use_container_width=True)
+
+            # AI Query Generator
+            st.subheader("🤖 AI Query Assistant")
+            if not st.session_state.gemini_model:
+                st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
+            else:
+                nl_query = st.text_area(
+                    "Describe what you want to query in plain English:",
+                    placeholder="e.g., 'show me the average income by city for users older than 30, sorted by income'",
+                    height=100,
+                    key="sql_ai_query"
+                )
+                if st.button("✨ Generate SQL with AI"):
+                    if nl_query:
+                        schema_str = pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()
+                        prompt = f"""You are an expert SQL developer.
+Given a table named `data` with the following schema:
+{schema_str}
+
+Write a SQL query to answer the following question:
+"{nl_query}"
+
+Provide only the SQL code in a single code block, without any explanation or surrounding text.
+"""
+                        generated_sql = generate_gemini_content(prompt)
+                        if generated_sql:
+                            cleaned_sql = re.sub(r"```(sql)?\n", "", generated_sql)
+                            cleaned_sql = re.sub(r"```", "", cleaned_sql).strip()
+                            st.session_state.current_query = cleaned_sql
+                            st.success("AI-generated SQL populated in the editor!")
+                            st.experimental_rerun() # Rerun to update the text_area
                     else:
-                        st.session_state.sql_result = result
-                        st.session_state.sql_history.append({
-                            'query': query,
-                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'rows': len(result)
-                        })
-                        st.success(f"Query executed successfully! Returned {len(result)} rows.")
-            
-            with col_b:
-                if st.button("📋 Show Schema"):
-                    schema_info = pd.DataFrame({
-                        'Column': df.columns,
-                        'Type': df.dtypes.astype(str),
-                        'Null Count': df.isnull().sum(),
-                        'Unique Values': df.nunique()
-                    })
-                    st.dataframe(schema_info)
-        
-        with col2:
+                        st.warning("Please enter a description for the AI to generate a query.")
+
+            # Query History
             st.subheader("📚 Query History")
             if st.session_state.sql_history:
                 for i, hist in enumerate(reversed(st.session_state.sql_history[-5:])):
-                    with st.expander(f"Query {len(st.session_state.sql_history) - i}"):
+                    with st.expander(f"Query {len(st.session_state.sql_history) - i} ({hist['timestamp']})"):
                         st.code(hist['query'], language='sql')
-                        st.caption(f"Executed: {hist['timestamp']} | Rows: {hist['rows']}")
-        
-        # Display Results
-        if hasattr(st.session_state, 'sql_result'):
-            st.subheader("📊 Query Results")
-            result = st.session_state.sql_result
-            st.dataframe(result)
+                        st.caption(f"Rows: {hist['rows']} | Duration: {hist.get('duration', 0.0):.4f}s")
+                        if st.button("Reuse this query", key=f"reuse_sql_{i}"):
+                            st.session_state.current_query = hist['query']
+                            st.experimental_rerun()
+            else:
+                st.info("No queries run in this session yet.")
+
+        with main_col:
+            st.subheader("✍️ SQL Query Editor")
             
-            # Export options
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.download_button(
-                    "💾 Download CSV",
-                    result.to_csv(index=False),
-                    file_name=f"sql_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
-            with col2:
-                st.download_button(
-                    "📄 Download JSON",
-                    result.to_json(orient='records'),
-                    file_name=f"sql_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json"
-                )
+            query = st.text_area(
+                "Enter your SQL query here. The table is named `data`.",
+                value=st.session_state.get('current_query', 'SELECT * FROM data LIMIT 10;'),
+                height=200,
+                key="sql_query_editor"
+            )
+            st.session_state.current_query = query # Persist changes immediately
+
+            if st.button("🚀 Execute Query", type="primary"):
+                result, error, duration = execute_sql_query(df, query)
+                st.session_state.sql_query_duration = duration # Store duration for display
+                if error:
+                    st.session_state.sql_result = None
+                    st.error(f"SQL Error: {error}")
+                else:
+                    st.session_state.sql_result = result
+                    st.session_state.sql_history.append({
+                        'query': query,
+                        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'rows': len(result),
+                        'duration': duration
+                    })
+                    st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
+            
+            # Display Results
+            if 'sql_result' in st.session_state and st.session_state.sql_result is not None:
+                st.subheader("📊 Query Results")
+                result_df = st.session_state.sql_result
+                st.dataframe(result_df)
+                
+                # Export options
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.download_button(
+                        "💾 Download CSV",
+                        result_df.to_csv(index=False).encode('utf-8'),
+                        file_name=f"sql_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                with col2:
+                    st.download_button(
+                        "📄 Download JSON",
+                        result_df.to_json(orient='records'),
+                        file_name=f"sql_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json"
+                    )
+
+                # Visualization of results
+                with st.expander("🎨 Visualize Query Results", expanded=False):
+                    if not result_df.empty:
+                        st.markdown("Create a quick plot from your query results.")
+                        
+                        # Get available columns for plotting
+                        numeric_cols_res = result_df.select_dtypes(include=np.number).columns.tolist()
+                        all_cols_res = result_df.columns.tolist()
+                        
+                        if not numeric_cols_res:
+                            st.info("No numeric columns in the result to plot.")
+                        else:
+                            plot_type = st.selectbox("Chart Type", ["Bar", "Line", "Scatter", "Histogram"], key="sql_viz_type")
+                            
+                            try:
+                                if plot_type in ["Bar", "Line", "Scatter"]:
+                                    viz_cols = st.columns(2)
+                                    with viz_cols[0]:
+                                        x_axis = st.selectbox("X-axis", all_cols_res, key="sql_viz_x")
+                                    with viz_cols[1]:
+                                        y_axis = st.selectbox("Y-axis", numeric_cols_res, key="sql_viz_y")
+                                    
+                                    if x_axis and y_axis:
+                                        if plot_type == "Bar":
+                                            fig = px.bar(result_df, x=x_axis, y=y_axis, title=f"Bar Chart: {y_axis} by {x_axis}")
+                                        elif plot_type == "Line":
+                                            fig = px.line(result_df, x=x_axis, y=y_axis, title=f"Line Chart: {y_axis} over {x_axis}")
+                                        elif plot_type == "Scatter":
+                                            fig = px.scatter(result_df, x=x_axis, y=y_axis, title=f"Scatter Plot: {y_axis} vs {x_axis}")
+                                        st.plotly_chart(fig, use_container_width=True)
+
+                                elif plot_type == "Histogram":
+                                    hist_col = st.selectbox("Column for Histogram", numeric_cols_res, key="sql_viz_hist_col")
+                                    if hist_col:
+                                        fig = px.histogram(result_df, x=hist_col, title=f"Histogram of {hist_col}")
+                                        st.plotly_chart(fig, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Could not generate plot: {e}")
+                    else:
+                        st.info("Result is empty, nothing to visualize.")
 
 elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
     st.markdown('<h2 class="tool-header">📊 Advanced Exploratory Data Analysis</h2>', unsafe_allow_html=True)

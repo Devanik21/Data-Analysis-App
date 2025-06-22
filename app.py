@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import seaborn as sns
-import matplotlib.pyplot as pltlllllllll
+import matplotlib.pyplot as plt
 import sqlite3
 import duckdb
 import requests
@@ -2133,35 +2133,35 @@ Use markdown for formatting.
 
 
 elif selected_tool == "📈 Excel Query Tool":
-    st.markdown('<h2 class="tool-header">📈 Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="tool-header">📈 Super-Advanced Excel Query Tool</h2>', unsafe_allow_html=True)
 
     # --- Excel Query Examples ---
     with st.expander("📊 Excel Query Examples", expanded=False):
         st.markdown("""
-**1. VLOOKUP Example:**  
-Find the email of user with ID 123  
-- Lookup Column: `user_id`  
-- Lookup Value: `123`  
-- Return Column: `email`
+**1. XLOOKUP (New):**
+Find the `email` and `city` for the user with `user_id` 123.
+- Lookup Value: `123`
+- Lookup Column: `user_id`
+- Return Columns: `email`, `city`
 
-**2. PIVOT Example:**  
-Summarize total sales by region and product  
-- Index: `region`  
-- Columns: `product`  
-- Values: `sales`  
+**2. Advanced Filter (New):**
+Show all rows where (`country` is "USA" AND `age` > 30) OR (`status` is "Active").
+
+**3. SUMIFS (New):**
+Sum `sales` where `region` is "North" AND `product_category` is "Electronics".
+
+**4. Goal Seek (New):**
+Find the universal `discount` (`x`) needed to make the total profit (`(df['price'] - df['cost']) * (1-x)` ) equal to $50,000.
+
+**5. Conditional Formatting (New):**
+Highlight all `sales` values over 1000 in green.
+
+**6. PIVOT Example:**
+Summarize total `sales` by `region` and `product`.
+- Index: `region`
+- Columns: `product`
+- Values: `sales`
 - Aggregation: `sum`
-
-**3. FILTER Example:**  
-Show all rows where `status` contains "Active"
-
-**4. SORT Example:**  
-Sort by `created_at` in descending order
-
-**5. SUMIF Example:**  
-Sum `amount` where `category` contains "Food"
-
-**6. SPLIT Example:**  
-Split `full_name` by space into `first_name` and `last_name`
         """)
 
     if st.session_state.df is None:
@@ -2171,13 +2171,65 @@ Split `full_name` by space into `first_name` and `last_name`
         
         st.subheader("🔧 Excel-Style Operations")
         
-        operation = st.selectbox("Select Operation", [
-            "VLOOKUP", "HLOOKUP", "INDEX/MATCH", "PIVOT", "FILTER", "SORT", "GROUPBY", 
-            "SUMIF", "COUNTIF", "AVERAGEIF", "CONCATENATE", "SPLIT",
-            "Text: LEFT/RIGHT/MID", "Text: FIND/REPLACE", "Text: TRIM/UPPER/LOWER/LEN", "Math: ROUND/ABS/SQRT", "Math: POWER/MOD", "Statistical: RANK/PERCENTILE", "Logical: IF (Conditional Column)", "Data: Transpose", "Data: Fill Down/Up", "Date/Time: Extract Component"
-        ])
+        # New categorized structure
+        op_category = st.selectbox("Select Operation Category", [
+            "Lookup & Reference", "Conditional Aggregation", "Filtering & Sorting", "Pivoting & Grouping",
+            "Text Manipulation", "Math & Statistical", "Logical & Data Shaping", "Advanced Tools"
+        ], key="excel_op_category")
+
+        operations_map = {
+            "Lookup & Reference": ["XLOOKUP (New)", "VLOOKUP", "HLOOKUP", "INDEX/MATCH"],
+            "Conditional Aggregation": ["SUMIFS/COUNTIFS/AVERAGEIFS (New)", "SUMIF", "COUNTIF", "AVERAGEIF"],
+            "Filtering & Sorting": ["Advanced Filter (New)", "SORT"],
+            "Pivoting & Grouping": ["PIVOT", "GROUPBY"],
+            "Text Manipulation": ["CONCATENATE", "SPLIT", "Text: LEFT/RIGHT/MID", "Text: FIND/REPLACE", "Text: TRIM/UPPER/LOWER/LEN"],
+            "Math & Statistical": ["Math: ROUND/ABS/SQRT", "Math: POWER/MOD", "Statistical: RANK/PERCENTILE"],
+            "Logical & Data Shaping": ["Logical: IF (Conditional Column)", "Data: Transpose", "Data: Fill Down/Up", "Date/Time: Extract Component"],
+            "Advanced Tools": ["Goal Seek (New)", "Conditional Formatting (New)"]
+        }
+
+        operation = st.selectbox("Select Operation", operations_map[op_category], key="excel_operation_select")
         
-        if operation == "VLOOKUP":
+        if operation == "XLOOKUP (New)":
+            st.subheader("🔍 XLOOKUP Operation")
+            st.info("A modern and powerful lookup. Finds a value in a column and returns corresponding values from other columns.")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                lookup_value_x = st.text_input("Lookup Value", key="xlookup_value")
+                lookup_col_x = st.selectbox("Lookup Column (where to search)", df.columns.tolist(), key="xlookup_col")
+                if_not_found_x = st.text_input("Value if not found (optional)", key="xlookup_not_found")
+            with c2:
+                return_cols_x = st.multiselect("Return Columns (what to get back)", df.columns.tolist(), key="xlookup_return_cols")
+                search_direction_x = st.radio("Search Direction", ["First to Last", "Last to First"], key="xlookup_search_dir")
+
+            if st.button("Execute XLOOKUP", key="excel_execute_xlookup"):
+                if not lookup_value_x or not lookup_col_x or not return_cols_x:
+                    st.warning("Please provide a lookup value, lookup column, and at least one return column.")
+                else:
+                    try:
+                        temp_df = df.copy()
+                        # Use a temporary column for matching to handle different types
+                        temp_df['_match_col'] = temp_df[lookup_col_x].astype(str)
+                        
+                        if search_direction_x == "Last to First":
+                            temp_df = temp_df.iloc[::-1] # Reverse the DataFrame
+
+                        match_index = temp_df[temp_df['_match_col'] == lookup_value_x].index.values
+
+                        if len(match_index) > 0:
+                            result_df = df.loc[match_index[0], return_cols_x]
+                            st.success("Match found:")
+                            st.dataframe(result_df.to_frame().T)
+                        else:
+                            st.warning("No exact match found.")
+                            if if_not_found_x:
+                                st.write(f"Result if not found: {if_not_found_x}")
+
+                    except Exception as e:
+                        st.error(f"Error during XLOOKUP: {str(e)}")
+
+        elif operation == "VLOOKUP":
             st.subheader("🔍 VLOOKUP Operation")
             lookup_col = st.selectbox("Lookup Column", df.columns.tolist())
             lookup_value = st.text_input("Lookup Value")
@@ -2287,50 +2339,76 @@ Split `full_name` by space into `first_name` and `last_name`
                 except Exception as e:
                     st.error(f"Error creating pivot table: {str(e)}")
         
-        elif operation == "FILTER":
-            st.subheader("🔍 Advanced Filter")
-            filter_col = st.selectbox("Filter Column", df.columns.tolist())
-            filter_type = st.selectbox("Filter Type", ["Contains", "Equals", "Greater Than", "Less Than", "Between"])
-            
-            if filter_type in ["Contains", "Equals"]:
-                filter_value = st.text_input("Filter Value")
-                if st.button("Apply Filter"):
-                    if filter_type == "Contains":
-                        filtered_df = df[df[filter_col].astype(str).str.contains(filter_value, case=False, na=False)]
-                    else:
-                        filtered_df = df[df[filter_col] == filter_value]
-                    
-                    st.success(f"Filtered to {len(filtered_df)} rows")
-                    st.dataframe(filtered_df)
-            
-            elif filter_type in ["Greater Than", "Less Than"]:
-                if df[filter_col].dtype in ['int64', 'float64']:
-                    filter_value = st.number_input("Filter Value", value=float(df[filter_col].mean() if not df[filter_col].empty else 0))
-                    if st.button("Apply Filter"):
-                        if filter_type == "Greater Than":
-                            filtered_df = df[df[filter_col] > filter_value]
-                        else:
-                            filtered_df = df[df[filter_col] < filter_value]
+        elif operation == "Advanced Filter (New)":
+            st.subheader("🔍 Advanced Filter with Multiple Conditions")
+            st.info("Add multiple rules to filter your data. The first rule is applied directly, subsequent rules are combined using the selected logic (AND/OR).")
+
+            if 'filter_rules' not in st.session_state:
+                st.session_state.filter_rules = [{'Logic': 'AND', 'Column': df.columns[0], 'Condition': 'Contains', 'Value': ''}]
+
+            edited_rules = st.data_editor(
+                st.session_state.filter_rules,
+                num_rows="dynamic",
+                column_config={
+                    "Logic": st.column_config.SelectboxColumn("Logic", help="How to combine with the previous rule", options=["AND", "OR"], required=True),
+                    "Column": st.column_config.SelectboxColumn("Column", help="Column to filter", options=df.columns.tolist(), required=True),
+                    "Condition": st.column_config.SelectboxColumn("Condition", help="The filter condition", options=["Contains", "Does Not Contain", "Equals", "Not Equal To", "Greater Than", "Less Than", "Is Null", "Is Not Null"], required=True),
+                    "Value": st.column_config.TextColumn("Value", help="Value for the condition (not needed for Is Null/Is Not Null)")
+                },
+                key="excel_filter_rules_editor"
+            )
+            st.session_state.filter_rules = edited_rules
+
+            if st.button("Apply Advanced Filter", key="excel_execute_advanced_filter"):
+                if not edited_rules or not edited_rules[0]['Column']:
+                    st.warning("Please configure at least one filter rule.")
+                else:
+                    try:
+                        final_mask = pd.Series(True, index=df.index)
                         
+                        for i, rule in enumerate(edited_rules):
+                            col = rule['Column']
+                            cond = rule['Condition']
+                            val = rule['Value']
+                            
+                            # Convert value for numeric comparisons
+                            numeric_val = pd.to_numeric(val, errors='coerce')
+
+                            if cond == "Is Null":
+                                current_mask = df[col].isnull()
+                            elif cond == "Is Not Null":
+                                current_mask = df[col].notnull()
+                            elif cond == "Contains":
+                                current_mask = df[col].astype(str).str.contains(val, case=False, na=False)
+                            elif cond == "Does Not Contain":
+                                current_mask = ~df[col].astype(str).str.contains(val, case=False, na=False)
+                            elif cond == "Equals":
+                                current_mask = df[col].astype(str) == val
+                            elif cond == "Not Equal To":
+                                current_mask = df[col].astype(str) != val
+                            elif cond in ["Greater Than", "Less Than"] and not pd.isna(numeric_val):
+                                if cond == "Greater Than":
+                                    current_mask = df[col] > numeric_val
+                                else: # Less Than
+                                    current_mask = df[col] < numeric_val
+                            else:
+                                # If condition is numeric but value is not, or other error, skip rule
+                                st.warning(f"Skipping rule {i+1} due to invalid value for numeric comparison.")
+                                continue
+
+                            if i == 0:
+                                final_mask = current_mask
+                            elif rule['Logic'] == 'AND':
+                                final_mask = final_mask & current_mask
+                            elif rule['Logic'] == 'OR':
+                                final_mask = final_mask | current_mask
+                        
+                        filtered_df = df[final_mask]
                         st.success(f"Filtered to {len(filtered_df)} rows")
                         st.dataframe(filtered_df)
-                else:
-                    st.error("Selected column is not numeric")
-            
-            elif filter_type == "Between":
-                if df[filter_col].dtype in ['int64', 'float64']:
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        min_value = st.number_input("Minimum Value", value=float(df[filter_col].min() if not df[filter_col].empty else 0))
-                    with col_b:
-                        max_value = st.number_input("Maximum Value", value=float(df[filter_col].max() if not df[filter_col].empty else 0))
-                    
-                    if st.button("Apply Filter"):
-                        filtered_df = df[(df[filter_col] >= min_value) & (df[filter_col] <= max_value)]
-                        st.success(f"Filtered to {len(filtered_df)} rows")
-                        st.dataframe(filtered_df)
-                else:
-                    st.error("Selected column is not numeric")
+
+                    except Exception as e:
+                        st.error(f"Error applying filter: {e}")
         
         elif operation == "SORT":
             st.subheader("⬆️⬇️ Sort Data")
@@ -2374,6 +2452,62 @@ Split `full_name` by space into `first_name` and `last_name`
                     except Exception as e:
                         st.error(f"Error executing Group By: {str(e)}")
         
+        elif operation == "SUMIFS/COUNTIFS/AVERAGEIFS (New)":
+            st.subheader("🧮 Multi-Condition Aggregation")
+            agg_type = st.radio("Aggregation Type", ["SUMIFS", "COUNTIFS", "AVERAGEIFS"], horizontal=True, key="excel_aggifs_type")
+
+            if agg_type in ["SUMIFS", "AVERAGEIFS"]:
+                agg_col = st.selectbox("Column to Aggregate (must be numeric)", df.select_dtypes(include=[np.number]).columns.tolist(), key="excel_aggifs_agg_col")
+            else:
+                agg_col = None # Not needed for COUNTIFS
+
+            st.markdown("##### Define Criteria")
+            if 'aggifs_rules' not in st.session_state:
+                st.session_state.aggifs_rules = [{'Column': df.columns[0], 'Condition': 'Equals', 'Value': ''}]
+
+            edited_rules_aggifs = st.data_editor(
+                st.session_state.aggifs_rules,
+                num_rows="dynamic",
+                column_config={
+                    "Column": st.column_config.SelectboxColumn("Criteria Column", options=df.columns.tolist(), required=True),
+                    "Condition": st.column_config.SelectboxColumn("Condition", options=["Contains", "Equals", "Greater Than", "Less Than"], required=True),
+                    "Value": st.column_config.TextColumn("Criteria Value", required=True)
+                },
+                key="excel_aggifs_rules_editor"
+            )
+            st.session_state.aggifs_rules = edited_rules_aggifs
+
+            if st.button(f"Execute {agg_type}", key="excel_execute_aggifs"):
+                if (agg_type != "COUNTIFS" and not agg_col):
+                    st.error("Please select a numeric column to aggregate for SUMIFS/AVERAGEIFS.")
+                else:
+                    try:
+                        # Start with a mask that is all True
+                        final_mask = pd.Series(True, index=df.index)
+                        for rule in edited_rules_aggifs:
+                            if not rule['Column'] or not rule['Value']: continue
+                            col, cond, val = rule['Column'], rule['Condition'], rule['Value']
+                            numeric_val = pd.to_numeric(val, errors='coerce')
+
+                            if cond == "Contains":
+                                final_mask &= df[col].astype(str).str.contains(val, case=False, na=False)
+                            elif cond == "Equals":
+                                final_mask &= df[col].astype(str) == val
+                            elif cond == "Greater Than" and not pd.isna(numeric_val):
+                                final_mask &= df[col] > numeric_val
+                            elif cond == "Less Than" and not pd.isna(numeric_val):
+                                final_mask &= df[col] < numeric_val
+                        
+                        if agg_type == "COUNTIFS":
+                            result = final_mask.sum()
+                        elif agg_type == "SUMIFS":
+                            result = df.loc[final_mask, agg_col].sum()
+                        elif agg_type == "AVERAGEIFS":
+                            result = df.loc[final_mask, agg_col].mean()
+                        st.metric(f"Result of {agg_type}", f"{result:,.2f}")
+                    except Exception as e:
+                        st.error(f"Error executing {agg_type}: {e}")
+
         elif operation in ["SUMIF", "COUNTIF", "AVERAGEIF"]:
             st.subheader(f"🧮 {operation} Operation")
             condition_col = st.selectbox("Condition Column", df.columns.tolist())
@@ -2811,6 +2945,102 @@ Split `full_name` by space into `first_name` and `last_name`
 
                             except Exception as e:
                                 st.error(f"Error extracting datetime component: {str(e)}")
+
+        elif operation == "Goal Seek (New)":
+            st.subheader("🎯 Goal Seek")
+            st.info("Find an input value (`x`) for a formula to achieve a desired target value. This uses an iterative solver.")
+            st.warning("⚠️ This tool uses `eval()` to process the formula, which can be a security risk. Use with trusted data and formulas only.")
+            
+            try:
+                from scipy.optimize import root_scalar
+            except ImportError:
+                st.error("Scipy is required for Goal Seek. Please install it: `pip install scipy`")
+                st.stop()
+
+            st.markdown("#### 1. Define the Formula")
+            formula_str = st.text_input(
+                "Formula (must include 'x' as the variable to change)", 
+                value="(df['price'] * (1 - x)) - df['cost']",
+                help="Use 'df' for the DataFrame and 'x' for the variable you want to solve for. E.g., to find a discount `x` that affects profit."
+            )
+
+            st.markdown("#### 2. Set the Target")
+            c1, c2 = st.columns(2)
+            with c1:
+                agg_func_gs = st.selectbox("Aggregate the formula result using:", ["sum", "mean"], key="gs_agg_func")
+            with c2:
+                target_value_gs = st.number_input("Set aggregated result to value:", value=100000.0, format="%.2f", key="gs_target")
+
+            st.markdown("#### 3. Configure the Solver")
+            c3, c4 = st.columns(2)
+            with c3:
+                bracket_low = st.number_input("Search Bracket (Low)", value=-1.0, key="gs_bracket_low")
+            with c4:
+                bracket_high = st.number_input("Search Bracket (High)", value=1.0, key="gs_bracket_high")
+
+            if st.button("Run Goal Seek", key="excel_execute_gs"):
+                if 'x' not in formula_str:
+                    st.error("The formula must contain 'x' as the variable to be changed.")
+                else:
+                    with st.spinner("Seeking solution..."):
+                        try:
+                            # Define the objective function for the solver
+                            def objective_func(x, df_obj, formula, agg_func, target):
+                                # This is where the user's formula is evaluated
+                                result_series = eval(formula, {'df': df_obj, 'np': np, 'x': x})
+                                current_agg = result_series.agg(agg_func)
+                                return current_agg - target
+
+                            # Run the solver
+                            sol = root_scalar(
+                                objective_func, 
+                                args=(df, formula_str, agg_func_gs, target_value_gs),
+                                bracket=[bracket_low, bracket_high],
+                                method='brentq'
+                            )
+
+                            if sol.converged:
+                                st.success(f"Solution Found!")
+                                st.metric("Required value for `x`", f"{sol.root:.6f}")
+                                st.write(f"The solver converged in {sol.function_calls} iterations.")
+                            else:
+                                st.error("Solver did not converge. Try adjusting the search bracket or checking your formula.")
+                                st.write(sol)
+
+                        except Exception as e:
+                            st.error(f"An error occurred during Goal Seek: {e}")
+                            st.info("Check if your formula is valid and the columns exist.")
+
+        elif operation == "Conditional Formatting (New)":
+            st.subheader("🎨 Conditional Formatting")
+            st.info("Define rules to visually style your data. The formatting is applied to the displayed table below.")
+
+            if 'cf_rules' not in st.session_state:
+                st.session_state.cf_rules = [{'Column': df.columns[0], 'Condition': 'Greater Than', 'Value': '100', 'Style': 'background-color: lightgreen'}]
+
+            edited_rules_cf = st.data_editor(
+                st.session_state.cf_rules,
+                num_rows="dynamic",
+                column_config={
+                    "Column": st.column_config.SelectboxColumn("Column", options=df.columns.tolist(), required=True),
+                    "Condition": st.column_config.SelectboxColumn("Condition", options=["Greater Than", "Less Than", "Equals", "Contains"], required=True),
+                    "Value": st.column_config.TextColumn("Value", required=True),
+                    "Style": st.column_config.SelectboxColumn("Style", options=['background-color: lightgreen', 'background-color: lightcoral', 'background-color: lightyellow', 'font-weight: bold; color: blue'], required=True)
+                },
+                key="excel_cf_rules_editor"
+            )
+
+            def apply_styles(val, rules, col_name):
+                style = ''
+                for rule in rules:
+                    if rule['Column'] == col_name:
+                        # Simplified logic for demo
+                        if rule['Condition'] == 'Greater Than' and pd.to_numeric(val, errors='coerce') > pd.to_numeric(rule['Value'], errors='coerce'):
+                            style = rule['Style']
+                return style
+
+            st.dataframe(df.head(100).style.apply(lambda x: [f'background-color: {"lightcoral" if v > 0 else "lightgreen"}' if (isinstance(v, (int,float)) and x.name in [r['Column'] for r in edited_rules_cf if r['Condition']=='Greater Than' and v > pd.to_numeric(r['Value'], errors='coerce')]) else '' for v in x], axis=0))
+            st.warning("Conditional formatting preview is limited for performance. Full styling would be applied on export.")
 
 elif selected_tool == "💼 Power BI Dashboard":
     st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)

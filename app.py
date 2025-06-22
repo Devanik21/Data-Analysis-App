@@ -3184,6 +3184,8 @@ if selected_tool == "🤖 AI-Powered Insights (Gemini)":
         
         ai_options = [
             "📝 Automated Data Summary",
+            "📊 Natural Language to Chart",
+            "🛠️ Feature Engineering Suggestions",
             "💬 Natural Language to Code",
             "🧠 Code Explanation"
         ]
@@ -3228,6 +3230,114 @@ Keep the summary clear, concise, and use markdown for formatting.
                 summary = generate_gemini_content(prompt)
                 if summary:
                     st.markdown(summary)
+
+        elif selected_ai_task == "📊 Natural Language to Chart":
+            st.subheader("📊 Natural Language to Chart")
+            st.info("Describe the chart you want to create. For example: 'a scatter plot of column A vs column B, colored by column C'")
+            
+            chart_request = st.text_area("Your chart request:", placeholder="e.g., 'a bar chart showing the average income per city'")
+            
+            if st.button("Generate Chart", type="primary"):
+                if chart_request:
+                    # Get schema for the prompt
+                    schema = pd.DataFrame({
+                        'Column': df.columns,
+                        'DataType': df.dtypes.astype(str)
+                    }).to_string()
+
+                    prompt = f"""
+You are an expert Python data visualization specialist who uses the plotly.express library.
+Given a pandas DataFrame named `df` with the following schema:
+{schema}
+
+And a small sample of the data:
+{df.head().to_string()}
+
+Write Python code using `plotly.express` (as px) to generate a chart that fulfills the following user request:
+"{chart_request}"
+
+Your code should:
+1.  Import `plotly.express` as `px`.
+2.  Create a single figure object and assign it to a variable named `fig`.
+3.  Do NOT use `fig.show()` or `st.plotly_chart()`.
+4.  Provide only the Python code in a single code block, without any explanation or surrounding text.
+5.  If a column needs to be converted (e.g., to numeric or datetime), include that in the code.
+"""
+                    
+                    generated_code = generate_gemini_content(prompt)
+                    if generated_code:
+                        # Clean up the response to get only the code block
+                        cleaned_code = re.sub(r"```(python)?\n", "", generated_code)
+                        cleaned_code = re.sub(r"```", "", cleaned_code).strip()
+                        
+                        st.subheader("Generated Code")
+                        st.code(cleaned_code, language='python')
+                        
+                        st.subheader("Generated Chart")
+                        st.warning("⚠️ Executing AI-generated code. Review the code for safety before running in production.")
+                        
+                        try:
+                            # Create a safe execution environment
+                            exec_globals = {
+                                'df': df.copy(),
+                                'pd': pd,
+                                'px': px,
+                                'go': go,
+                                'np': np
+                            }
+                            
+                            # Execute code
+                            exec(cleaned_code, exec_globals)
+                            
+                            # Capture the figure
+                            if 'fig' in exec_globals and isinstance(exec_globals['fig'], go.Figure):
+                                fig = exec_globals['fig']
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.error("The generated code did not produce a valid Plotly figure object named 'fig'.")
+                        
+                        except Exception as e:
+                            st.error(f"Error executing generated code: {e}")
+                else:
+                    st.warning("Please enter a chart request.")
+
+        elif selected_ai_task == "🛠️ Feature Engineering Suggestions":
+            st.subheader("🛠️ Feature Engineering Suggestions")
+            st.info("Let Gemini analyze your data and suggest new features to improve model performance or analysis.")
+            
+            if st.button("Generate Suggestions", type="primary"):
+                # Create a comprehensive prompt
+                with io.StringIO() as buffer:
+                    df.info(buf=buffer)
+                    info_str = buffer.getvalue()
+                
+                prompt = f"""
+You are an expert data scientist specializing in feature engineering.
+Analyze the following dataset and suggest potential new features that could be created.
+
+The dataset has {df.shape[0]} rows and {df.shape[1]} columns.
+
+Here is the output of `df.info()`:
+```
+{info_str}
+```
+
+Here is a sample of the data (`df.head()`):
+```
+{df.head().to_string()}
+```
+
+Based on this information, provide a list of feature engineering suggestions. For each suggestion:
+1.  **Clearly state the new feature(s)** to be created.
+2.  **Provide the rationale**: Explain *why* this feature might be useful for analysis or a machine learning model.
+3.  **Provide the Pandas code** to create the feature. Assume the DataFrame is named `df`.
+
+Organize your response using markdown, with clear headings for each suggestion category (e.g., "Date/Time Features", "Interaction Features", "Binning/Discretization", "Categorical Encoding").
+If no features of a certain type are applicable, don't include that section.
+"""
+                suggestions = generate_gemini_content(prompt)
+                if suggestions:
+                    st.markdown(suggestions)
 
         elif selected_ai_task == "💬 Natural Language to Code":
             st.subheader("💬 Natural Language to Code")

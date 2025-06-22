@@ -2627,150 +2627,145 @@ Split `full_name` by space into `first_name` and `last_name`
 
 elif selected_tool == "💼 Power BI Dashboard":
     st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)
-    
+
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
         try:
-            # Set plotting themes
-            sns.set_theme(style="whitegrid", palette="muted")
-            px.defaults.template = "plotly_white"
-
-            # --- Dashboard Filters ---
-            st.subheader(" interactivity Dashboard Filters")
-            
-            # Automatically select columns for filtering
+            # --- Column Selection for Plots ---
             numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
             categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            date_cols = df.select_dtypes(include=['datetime64', 'datetime64[ns]']).columns.tolist()
+            # Basic lat/lon detection
+            lat_col = next((c for c in df.columns if 'lat' in c.lower()), None)
+            lon_col = next((c for c in df.columns if 'lon' in c.lower() or 'lng' in c.lower()), None)
+
+            px.defaults.template = "plotly_white" # Set a clean theme
             
+            # --- Dashboard Filters ---
+            st.subheader(" interactivity Dashboard Filters")            
             filtered_df = df.copy()
 
             with st.expander("Filter Controls", expanded=True):
-                filter_cols = st.columns(4)
-                
+                filter_cols_ui = st.columns(4)
                 # Categorical Filters
-                cat_filter_cols = categorical_cols[:3] # Use up to 3 categorical filters
-                for i, col in enumerate(cat_filter_cols):
-                    with filter_cols[i]:
-                        unique_vals = df[col].unique()
-                        selected_vals = st.multiselect(f"Filter by {col}", unique_vals, default=unique_vals)
-                        if selected_vals != list(unique_vals):
+                for i, col in enumerate(categorical_cols[:3]): # Use up to 3 categorical filters
+                    with filter_cols_ui[i]:
+                        unique_vals = sorted(df[col].dropna().unique())
+                        selected_vals = st.multiselect(f"Filter by {col}", unique_vals, default=unique_vals, key=f"bi_filter_{col}")
+                        if selected_vals != unique_vals:
                             filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
 
                 # Numeric Filter
                 if numeric_cols:
-                    with filter_cols[3]:
-                        num_col_filter = numeric_cols[0]
+                    with filter_cols_ui[3]:
+                        num_col_filter = st.selectbox("Filter by Numeric Column", numeric_cols, key="bi_num_filter_col")
                         min_val, max_val = float(df[num_col_filter].min()), float(df[num_col_filter].max())
-                        selected_range = st.slider(f"Filter by {num_col_filter}", min_val, max_val, (min_val, max_val))
-                        filtered_df = filtered_df[filtered_df[num_col_filter].between(selected_range[0], selected_range[1])]
+                        if min_val < max_val:
+                            selected_range = st.slider(f"Range for {num_col_filter}", min_val, max_val, (min_val, max_val), key=f"bi_filter_slider_{num_col_filter}")
+                            filtered_df = filtered_df[filtered_df[num_col_filter].between(selected_range[0], selected_range[1])]
+
+            if filtered_df.empty:
+                st.warning("No data matches the current filter settings.")
+                return
 
             # --- KPIs ---
             st.subheader("Key Performance Indicators")
             kpi_cols = st.columns(4)
-            
-            original_rows = len(df)
-            filtered_rows = len(filtered_df)
-            kpi_cols[0].metric("Records", f"{filtered_rows:,}", f"{filtered_rows/original_rows:.1%} of total" if original_rows > 0 else "N/A")
-
-            if numeric_cols and not filtered_df.empty:
-                kpi_col_1 = numeric_cols[0]
-                original_mean = df[kpi_col_1].mean()
-                filtered_mean = filtered_df[kpi_col_1].mean()
-                delta = filtered_mean - original_mean if not np.isnan(filtered_mean) and not np.isnan(original_mean) else None
-                kpi_cols[1].metric(f"Avg. {kpi_col_1}", f"{filtered_mean:,.2f}", f"{delta:,.2f}" if delta is not None else None)
-
-            if len(numeric_cols) > 1 and not filtered_df.empty:
-                kpi_col_2 = numeric_cols[1]
-                original_sum = df[kpi_col_2].sum()
-                filtered_sum = filtered_df[kpi_col_2].sum()
-                delta_sum = filtered_sum - original_sum
-                kpi_cols[2].metric(f"Total {kpi_col_2}", f"{filtered_sum:,.2f}", f"{delta_sum:,.2f}")
-            
-            if categorical_cols and not filtered_df.empty:
-                kpi_col_3 = categorical_cols[0]
-                unique_count = filtered_df[kpi_col_3].nunique()
-                kpi_cols[3].metric(f"Unique {kpi_col_3}", f"{unique_count:,}")
+            kpi_cols[0].metric("Filtered Records", f"{len(filtered_df):,}", f"{len(filtered_df)/len(df):.1%} of total")
+            if numeric_cols: kpi_cols[1].metric(f"Avg. {numeric_cols[0]}", f"{filtered_df[numeric_cols[0]].mean():,.2f}")
+            if len(numeric_cols) > 1: kpi_cols[2].metric(f"Total {numeric_cols[1]}", f"{filtered_df[numeric_cols[1]].sum():,.2f}")
+            if categorical_cols: kpi_cols[3].metric(f"Unique {categorical_cols[0]}", f"{filtered_df[categorical_cols[0]].nunique():,}")
 
             st.markdown("---")
-
-            # --- Dashboard Layout ---
-            main_col, side_col = st.columns([3, 1])
-
-            with main_col:
-                st.markdown("#### Main Analysis Area")
-                
-                # Time Series Plot
-                date_cols = filtered_df.select_dtypes(include=['datetime64']).columns
-                if len(date_cols) > 0 and len(numeric_cols) > 0 and not filtered_df.empty:
-                    st.markdown("##### Time Series Trend")
-                    time_col = date_cols[0]
-                    value_col = numeric_cols[0]
-                    time_df = filtered_df.set_index(time_col)[value_col].resample('D').mean().reset_index() # Resample for clarity
-                    fig = px.line(time_df, x=time_col, y=value_col, title=f"Daily Average of {value_col} over Time")
+            st.markdown("### 📊 Row 1: Overview & Geospatial Insights")
+            row1_cols = st.columns(3)
+            with row1_cols[0]:
+                if date_cols and numeric_cols:
+                    time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index()
+                    fig = px.line(time_df, x=date_cols[0], y=numeric_cols[0], title=f"Monthly Avg of {numeric_cols[0]}", markers=True)
                     st.plotly_chart(fig, use_container_width=True)
-                
-                # Correlation Heatmap
-                if len(numeric_cols) > 1 and not filtered_df.empty:
-                    st.markdown("##### Correlation Heatmap")
-                    plt.figure(figsize=(10, 8))
+                else: st.info("Time series plot requires a date and a numeric column.")
+            with row1_cols[1]:
+                if categorical_cols and numeric_cols:
+                    bar_df = filtered_df.groupby(categorical_cols[0])[numeric_cols[0]].mean().sort_values(ascending=False).reset_index().head(10)
+                    fig = px.bar(bar_df, x=categorical_cols[0], y=numeric_cols[0], title=f"Top 10 Avg {numeric_cols[0]} by {categorical_cols[0]}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Bar chart requires a categorical and a numeric column.")
+            with row1_cols[2]:
+                if lat_col and lon_col and numeric_cols:
+                    fig = px.scatter_mapbox(filtered_df.dropna(subset=[lat_col, lon_col]), lat=lat_col, lon=lon_col, color=numeric_cols[0],
+                                            size=numeric_cols[0] if filtered_df[numeric_cols[0]].min() > 0 else None,
+                                            mapbox_style="carto-positron", zoom=1, title="Geospatial Distribution")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Geospatial plot requires lat/lon columns.")
+
+            st.markdown("---")
+            st.markdown("### 📈 Row 2: Distribution & Outlier Analysis")
+            row2_cols = st.columns(3)
+            with row2_cols[0]:
+                if numeric_cols:
+                    fig = px.histogram(filtered_df, x=numeric_cols[0], marginal="box", title=f"Distribution of {numeric_cols[0]}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Histogram requires a numeric column.")
+            with row2_cols[1]:
+                if len(numeric_cols) > 1:
+                    fig = px.box(filtered_df, y=numeric_cols[:min(5, len(numeric_cols))], title="Box Plots of Numeric Columns")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Box plots require at least two numeric columns.")
+            with row2_cols[2]:
+                if numeric_cols and categorical_cols:
+                    fig = px.violin(filtered_df, y=numeric_cols[0], x=categorical_cols[0], color=categorical_cols[0], box=True, title=f"Distribution of {numeric_cols[0]} by {categorical_cols[0]}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Violin plot requires a numeric and a categorical column.")
+
+            st.markdown("---")
+            st.markdown("### 🔗 Row 3: Relationship Analysis")
+            row3_cols = st.columns(2)
+            with row3_cols[0]:
+                if len(numeric_cols) > 1:
                     corr = filtered_df[numeric_cols].corr()
-                    mask = np.triu(np.ones_like(corr, dtype=bool))
-                    sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap='vlag', center=0)
-                    st.pyplot(plt.gcf())
-                    plt.clf() # Clear the figure
+                    fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', title="Correlation Heatmap")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Correlation heatmap requires at least two numeric columns.")
+            with row3_cols[1]:
+                if len(numeric_cols) > 1:
+                    color_opt = categorical_cols[0] if categorical_cols else None
+                    fig = px.scatter(filtered_df, x=numeric_cols[0], y=numeric_cols[1], color=color_opt,
+                                     trendline="ols", title=f"Scatter Plot: {numeric_cols[0]} vs {numeric_cols[1]}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Scatter plot requires at least two numeric columns.")
+            
+            if len(numeric_cols) > 1:
+                st.markdown("##### 2D Density Contour")
+                fig = px.density_contour(filtered_df, x=numeric_cols[0], y=numeric_cols[1], title=f"2D Density of {numeric_cols[0]} and {numeric_cols[1]}")
+                st.plotly_chart(fig, use_container_width=True)
 
-                # Joint Distribution Plot
-                if len(numeric_cols) > 1 and not filtered_df.empty:
-                    st.markdown("##### Bivariate Distribution Analysis")
-                    x_joint = numeric_cols[0]
-                    y_joint = numeric_cols[1]
-                    hue_joint = categorical_cols[0] if categorical_cols else None
-                    
-                    try:
-                        g = sns.jointplot(data=filtered_df, x=x_joint, y=y_joint, hue=hue_joint, kind="scatter", palette="viridis")
-                        g.fig.suptitle(f"Joint Distribution of {x_joint} and {y_joint}", y=1.02)
-                        st.pyplot(g.fig)
-                        plt.clf()
-                    except Exception as e:
-                        st.warning(f"Could not generate joint plot: {e}")
+            st.markdown("---")
+            st.markdown("### 🧩 Row 4: Categorical & Compositional Analysis")
+            row4_cols = st.columns(3)
+            with row4_cols[0]:
+                if len(categorical_cols) > 1 and numeric_cols:
+                    fig = px.treemap(filtered_df, path=[px.Constant("All"), categorical_cols[0], categorical_cols[1]], values=numeric_cols[0],
+                                     title=f"Treemap of {numeric_cols[0]} by {categorical_cols[0]} and {categorical_cols[1]}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Treemap requires at least two categorical and one numeric column.")
+            with row4_cols[1]:
+                if categorical_cols:
+                    cat_col_pie = next((c for c in categorical_cols if 1 < filtered_df[c].nunique() < 10), categorical_cols[0])
+                    counts = filtered_df[cat_col_pie].value_counts()
+                    fig = px.pie(counts, values=counts.values, names=counts.index, title=f"Breakdown by {cat_col_pie}", hole=0.4)
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Pie chart requires a categorical column.")
+            with row4_cols[2]:
+                if len(categorical_cols) > 1 and numeric_cols:
+                    stacked_df = filtered_df.groupby([categorical_cols[0], categorical_cols[1]])[numeric_cols[0]].sum().reset_index()
+                    fig = px.bar(stacked_df, x=categorical_cols[0], y=numeric_cols[0], color=categorical_cols[1],
+                                 title=f"Stacked Bar: Sum of {numeric_cols[0]} by Categories")
+                    st.plotly_chart(fig, use_container_width=True)
+                else: st.info("Stacked bar chart requires at least two categorical and one numeric column.")
 
-            with side_col:
-                st.markdown("#### Detailed Breakdowns")
-                
-                # Categorical Distribution (Donut Chart)
-                if categorical_cols and not filtered_df.empty:
-                    cat_col_pie = None
-                    for col in categorical_cols:
-                        if 1 < filtered_df[col].nunique() < 10:
-                            cat_col_pie = col
-                            break
-                    if cat_col_pie:
-                        st.markdown(f"##### Distribution of {cat_col_pie}")
-                        counts = filtered_df[cat_col_pie].value_counts()
-                        fig = px.pie(counts, values=counts.values, names=counts.index, title=f"Breakdown by {cat_col_pie}", hole=0.4)
-                        st.plotly_chart(fig, use_container_width=True)
-
-                # Numeric Distribution (Violin Plot)
-                if numeric_cols and not filtered_df.empty:
-                    st.markdown(f"##### Distribution of {numeric_cols[0]}")
-                    plt.figure(figsize=(6, 4))
-                    sns.violinplot(y=filtered_df[numeric_cols[0]], inner="quartile", palette="pastel")
-                    plt.title(f"Distribution of {numeric_cols[0]}")
-                    st.pyplot(plt.gcf())
-                    plt.clf()
-
-                # Another Categorical Plot (Countplot)
-                if len(categorical_cols) > 0 and not filtered_df.empty:
-                    cat_col_count = categorical_cols[-1] # Pick last one to vary
-                    if filtered_df[cat_col_count].nunique() < 20:
-                        st.markdown(f"##### Counts for {cat_col_count}")
-                        plt.figure(figsize=(6, 4))
-                        sns.countplot(y=filtered_df[cat_col_count], order=filtered_df[cat_col_count].value_counts().index, palette="viridis")
-                        plt.title(f"Value Counts for {cat_col_count}")
-                        st.pyplot(plt.gcf())
-                        plt.clf()
         except Exception as e:
             st.error(f"An error occurred while generating the dashboard: {e}")
             st.info("This can happen if the filtered data is empty or unsuitable for a specific plot. Try adjusting the filters.")

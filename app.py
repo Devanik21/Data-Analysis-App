@@ -29,6 +29,7 @@ import re
 import json
 import pickle
 from typing import Optional, Dict, Any, List
+from collections import Counter
 import google.generativeai as genai
 from wordcloud import WordCloud
 
@@ -1211,6 +1212,65 @@ Use markdown for formatting.
                                     st.markdown("---")
                                     st.markdown("#### 🤖 AI-Powered Interpretation")
                                     st.markdown(interpretation)
+
+                st.markdown("---")
+                st.markdown("#### 🔄 Data Transformations")
+                st.info("Apply common transformations to numeric data to address skewness or non-normality. This creates a new column with the transformed data.")
+                
+                transform_col = st.selectbox("Select Column to Transform", numeric_cols, key="dist_transform_col")
+                transform_type = st.selectbox("Select Transformation Type", ["None", "Log (ln)", "Square Root", "Box-Cox", "Yeo-Johnson"], key="dist_transform_type")
+                
+                if transform_type != "None" and transform_col:
+                    new_transformed_col_name = st.text_input("New Column Name for Transformed Data:", value=f"{transform_col}_{transform_type.lower().replace(' ', '_')}_transformed", key="dist_new_transform_col_name")
+                    
+                    if st.button("Apply Transformation and Visualize", key="dist_apply_transform"):
+                        df_transformed = df.copy()
+                        original_data = df_transformed[transform_col].dropna()
+                        
+                        try:
+                            if transform_type == "Log (ln)":
+                                if (original_data <= 0).any():
+                                    st.error("Log transformation requires all values to be positive. Consider adding a small constant or using Box-Cox/Yeo-Johnson.")
+                                    transformed_data = pd.Series([]) # Keep empty if error
+                                else:
+                                    transformed_data = np.log(original_data)
+                            elif transform_type == "Square Root":
+                                if (original_data < 0).any():
+                                    st.error("Square Root transformation requires all values to be non-negative.")
+                                    transformed_data = pd.Series([]) # Keep empty if error
+                                else:
+                                    transformed_data = np.sqrt(original_data)
+                            elif transform_type == "Box-Cox":
+                                if (original_data <= 0).any():
+                                    st.error("Box-Cox transformation requires all values to be positive. Consider adding a small constant or using Yeo-Johnson.")
+                                    transformed_data = pd.Series([]) # Keep empty if error
+                                else:
+                                    transformed_data, lambda_val = stats.boxcox(original_data)
+                                    st.info(f"Box-Cox Lambda (λ): {lambda_val:.4f}")
+                            elif transform_type == "Yeo-Johnson":
+                                transformed_data, lambda_val = stats.yeojohnson(original_data)
+                                st.info(f"Yeo-Johnson Lambda (λ): {lambda_val:.4f}")
+                            else:
+                                transformed_data = pd.Series([]) # Should not happen with "None" check
+                            
+                            if not transformed_data.empty:
+                                # Add transformed data to the main DataFrame copy
+                                df_transformed.loc[original_data.index, new_transformed_col_name] = transformed_data
+                                st.session_state.df = df_transformed
+                                st.success(f"Transformation applied. New column '{new_transformed_col_name}' created.")
+                                
+                                # Plot original vs transformed distributions
+                                fig_transform = make_subplots(rows=1, cols=2, subplot_titles=(f"Original Distribution of {transform_col}", f"Transformed Distribution ({transform_type})"))
+                                fig_transform.add_trace(go.Histogram(x=original_data, name='Original', histnorm='probability density'), row=1, col=1)
+                                fig_transform.add_trace(go.Histogram(x=transformed_data, name='Transformed', histnorm='probability density'), row=1, col=2)
+                                fig_transform.update_layout(height=400, showlegend=False)
+                                st.plotly_chart(fig_transform, use_container_width=True)
+
+                                st.dataframe(df_transformed[[transform_col, new_transformed_col_name]].head())
+
+                        except Exception as e:
+                            st.error(f"Error applying transformation: {e}")
+
                     else:
                         st.info("Not enough data for Shapiro-Wilk test (requires > 2 samples).")
         
@@ -1725,6 +1785,124 @@ Use markdown for formatting.
                 else:
                     st.warning("Parallel Coordinates Plot requires at least 3 numeric columns.")
 
+            st.markdown("#### Stationarity Tests (ADF & KPSS)")
+            st.info("Tests for stationarity are crucial for time series forecasting. A stationary series has constant mean, variance, and autocorrelation over time.")
+            
+            if numeric_cols and time_col:
+                ts_data_for_test = df.set_index(time_col)[value_col].dropna()
+                if len(ts_data_for_test) > 10: # ADF/KPSS need sufficient data points
+                    try:
+                        # ADF Test
+                        st.markdown("##### Augmented Dickey-Fuller (ADF) Test")
+                        adfuller_result = adfuller(ts_data_for_test)
+                        st.write(f"ADF Statistic: {adfuller_result[0]:.4f}")
+                        st.write(f"P-value: {adfuller_result[1]:.4f}")
+                        st.write("Critical Values:")
+                        for key, value in adfuller_result[4].items():
+                            st.write(f"  {key}: {value:.4f}")
+                        
+                        if adfuller_result[1] <= 0.05:
+                            st.success("Conclusion: The series is likely stationary (reject null hypothesis of non-stationarity).")
+                        else:
+                            st.warning("Conclusion: The series is likely non-stationary (fail to reject null hypothesis). Consider differencing.")
+
+                        # KPSS Test
+                        st.markdown("##### Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test")
+                        kpss_result = kpss(ts_data_for_test, regression='c') # 'c' for constant, 'ct' for constant and trend
+                        st.write(f"KPSS Statistic: {kpss_result[0]:.4f}")
+                        st.write(f"P-value: {kpss_result[1]:.4f}")
+                        st.write("Critical Values:")
+                        for key, value in kpss_result[3].items():
+                            st.write(f"  {key}: {value:.4f}")
+                        
+                        if kpss_result[1] <= 0.05:
+                            st.warning("Conclusion: The series is likely non-stationary (reject null hypothesis of stationarity).")
+                        else:
+                            st.success("Conclusion: The series is likely stationary (fail to reject null hypothesis).")
+
+                        st.info("Note: ADF and KPSS tests have opposite null hypotheses. If both agree, the conclusion is strong. If they disagree, further investigation is needed.")
+
+                    except Exception as e:
+                        st.error(f"Error performing stationarity tests: {e}")
+                else:
+                    st.info("Not enough data points for stationarity tests (need > 10).")
+            else:
+                st.info("Please select a time column and a numeric value column for stationarity tests.")
+
+        elif selected_eda == "🧬 Multivariate Analysis":
+            st.subheader("🧬 Advanced Multivariate Visualizations")
+            numeric_cols_mv = df.select_dtypes(include=np.number).columns.tolist()
+
+            if len(numeric_cols_mv) < 2:
+                st.warning("Multivariate analysis requires at least two numeric columns.")
+            else:
+                st.markdown("#### 📊 Pair Plot (Scatter Matrix)")
+                st.info("Visualizes pairwise relationships between selected numeric variables. Diagonal shows histograms or KDEs.")
+                
+                pair_plot_cols = st.multiselect(
+                    "Select columns for Pair Plot (2-5 recommended for performance)", 
+                    numeric_cols_mv, 
+                    default=numeric_cols_mv[:min(len(numeric_cols_mv), 4)], # Default to first 4 or fewer
+                    key="mv_pair_plot_cols"
+                )
+                
+                if pair_plot_cols and len(pair_plot_cols) >= 2:
+                    hue_col_pair = st.selectbox("Color by (Categorical Column - Optional)", ['None'] + df.select_dtypes(include=['object', 'category']).columns.tolist(), key="mv_pair_plot_hue")
+                    hue_col_pair = None if hue_col_pair == 'None' else hue_col_pair
+
+                    if st.button("Generate Pair Plot", key="mv_generate_pair_plot"):
+                        with st.spinner("Generating Pair Plot..."):
+                            try:
+                                fig_pair = px.scatter_matrix(df, dimensions=pair_plot_cols, color=hue_col_pair, title="Pair Plot of Selected Variables")
+                                fig_pair.update_layout(height=max(600, 200 * len(pair_plot_cols))) # Adjust height
+                                st.plotly_chart(fig_pair, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating pair plot: {e}")
+                elif pair_plot_cols and len(pair_plot_cols) < 2:
+                    st.warning("Please select at least two columns for the pair plot.")
+
+                st.markdown("---")
+                st.markdown("#### 🧊 3D Scatter Plot")
+                if len(numeric_cols_mv) < 3:
+                    st.info("3D Scatter Plot requires at least three numeric columns.")
+                else:
+                    x_3d = st.selectbox("Select X-axis for 3D Scatter", numeric_cols_mv, index=0, key="mv_3d_x")
+                    y_3d = st.selectbox("Select Y-axis for 3D Scatter", numeric_cols_mv, index=1 if len(numeric_cols_mv) > 1 else 0, key="mv_3d_y")
+                    z_3d = st.selectbox("Select Z-axis for 3D Scatter", numeric_cols_mv, index=2 if len(numeric_cols_mv) > 2 else 0, key="mv_3d_z")
+                    color_3d = st.selectbox("Color by (Optional)", ['None'] + df.columns.tolist(), key="mv_3d_color")
+                    color_3d = None if color_3d == 'None' else color_3d
+                    
+                    if st.button("Generate 3D Scatter Plot", key="mv_generate_3d_scatter"):
+                        with st.spinner("Generating 3D Scatter Plot..."):
+                            try:
+                                fig_3d = px.scatter_3d(df, x=x_3d, y=y_3d, z=z_3d, color=color_3d, title=f"3D Scatter Plot: {x_3d} vs {y_3d} vs {z_3d}")
+                                st.plotly_chart(fig_3d, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating 3D scatter plot: {e}")
+                
+                st.markdown("---")
+                st.markdown("#### 📊 Parallel Coordinates Plot")
+                st.info("Visualizes multiple numeric variables, with each variable represented by a vertical axis. Each data point is a line connecting its values across these axes.")
+                if len(numeric_cols_mv) >= 3:
+                    parallel_cols = st.multiselect(
+                        "Select columns for Parallel Coordinates Plot (3-7 recommended)",
+                        numeric_cols_mv,
+                        default=numeric_cols_mv[:min(len(numeric_cols_mv), 5)],
+                        key="mv_parallel_cols"
+                    )
+                    parallel_color_col = st.selectbox("Color by (Categorical Column - Optional)", ['None'] + df.select_dtypes(include=['object', 'category']).columns.tolist(), key="mv_parallel_color")
+                    parallel_color_col = None if parallel_color_col == 'None' else parallel_color_col
+
+                    if parallel_cols and len(parallel_cols) >=2 and st.button("Generate Parallel Coordinates Plot", key="mv_generate_parallel"):
+                        with st.spinner("Generating Parallel Coordinates Plot..."):
+                            try:
+                                fig_parallel = px.parallel_coordinates(df, dimensions=parallel_cols, color=parallel_color_col, title="Parallel Coordinates Plot")
+                                st.plotly_chart(fig_parallel, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating parallel coordinates plot: {e}")
+                else:
+                    st.warning("Parallel Coordinates Plot requires at least 3 numeric columns.")
+
         elif selected_eda == "🎨 Advanced Charting Studio":
             st.subheader("🎨 Advanced Charting Studio")
             st.info("Select a plot type and configure its parameters to create custom visualizations.")
@@ -1907,6 +2085,57 @@ Use markdown for formatting.
                         st.plotly_chart(fig_pca_scatter, use_container_width=True)
 
 
+            st.markdown("---")
+            st.markdown("#### 🌌 Non-linear Dimensionality Reduction (t-SNE / UMAP)")
+            st.info("""
+            **t-Distributed Stochastic Neighbor Embedding (t-SNE)** and **Uniform Manifold Approximation and Projection (UMAP)** are powerful non-linear dimensionality reduction techniques.
+            Unlike PCA, which focuses on preserving large pairwise distances to maximize variance, t-SNE and UMAP aim to preserve local structures (i.e., relationships between nearby data points).
+            This makes them excellent for visualizing high-dimensional data, especially for identifying clusters or manifold structures that linear methods might miss.
+
+            **When to use them:**
+            *   **Visualization**: When you want to see if there are natural groupings or patterns in your high-dimensional data that PCA doesn't reveal.
+            *   **Exploratory Data Analysis**: To gain insights into the underlying structure of complex datasets.
+            *   **Pre-processing for Clustering**: The 2D/3D output can sometimes be a good input for traditional clustering algorithms.
+
+            **Considerations:**
+            *   **Computational Cost**: t-SNE can be computationally expensive for very large datasets. UMAP is generally faster.
+            *   **Parameter Sensitivity**: Both algorithms have parameters (e.g., `perplexity` for t-SNE, `n_neighbors` for UMAP) that can significantly affect the resulting visualization. Experimentation is often needed.
+            *   **Interpretation**: While they reveal structure, the distances in the t-SNE/UMAP plot don't directly correspond to meaningful distances in the original high-dimensional space. Only the relative proximity matters.
+
+            **To use these, you would typically:**
+            1.  Install the necessary libraries (`scikit-learn` for t-SNE, `umap-learn` for UMAP).
+            2.  Scale your numeric data (e.g., using `StandardScaler`).
+            3.  Apply the algorithm (e.g., `TSNE(n_components=2).fit_transform(scaled_data)`).
+            4.  Plot the 2D/3D output, often coloring by known categories or cluster labels.
+            """)
+            
+            st.markdown("##### Example Code Structure (Conceptual)")
+            st.code("""
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.manifold import TSNE # or from umap import UMAP
+import plotly.express as px
+
+# Assuming 'df' is your DataFrame and 'numeric_cols_pca' are your numeric columns
+
+data_for_tsne = df[numeric_cols_pca].dropna()
+scaler = StandardScaler()
+scaled_data = scaler.fit_transform(data_for_tsne)
+
+tsne = TSNE(n_components=2, random_state=42, perplexity=30) # Adjust perplexity as needed
+tsne_results = tsne.fit_transform(scaled_data)
+
+tsne_df = pd.DataFrame(data=tsne_results, columns=['TSNE1', 'TSNE2'])
+# If you have original index or labels, add them back:
+# tsne_df['Original_Index'] = data_for_tsne.index
+# tsne_df['Category'] = df.loc[data_for_tsne.index, 'Your_Category_Column']
+
+fig_tsne = px.scatter(tsne_df, x='TSNE1', y='TSNE2', 
+                      # color='Category', # Uncomment if you have a category column
+                      title='t-SNE Projection of Data')
+fig_tsne.show() # In Streamlit, you'd use st.plotly_chart(fig_tsne)
+            """, language="python")
+
         elif selected_eda == "📋 Data Quality Report":
             st.subheader("📋 Data Quality Report")
             st.markdown(f"**Total Rows:** {len(df)}")
@@ -1981,6 +2210,10 @@ Use markdown for formatting.
                             cluster_df['pca2'] = components[:, 1]
                             
                             # Visualize
+                            # Calculate Silhouette Score
+                            if len(np.unique(cluster_df['cluster'])) > 1 and len(cluster_df) > 1:
+                                silhouette_avg = silhouette_score(scaled_cluster_data, cluster_df['cluster'])
+                                st.metric("Silhouette Score", f"{silhouette_avg:.3f}", help="Higher score indicates better-defined clusters.")
                             fig_cluster = px.scatter(cluster_df, x='pca1', y='pca2', color='cluster', color_continuous_scale=px.colors.qualitative.Vivid, title=f'K-Means Clustering (K={k_optimal}) on 2D PCA Projection', labels={'pca1': 'Principal Component 1', 'pca2': 'Principal Component 2'})
                             st.plotly_chart(fig_cluster, use_container_width=True)
 
@@ -2044,6 +2277,32 @@ Use markdown for formatting.
                             st.plotly_chart(fig_freq, use_container_width=True)
                     else:
                         st.info("The selected column contains no text to analyze.")
+
+                    st.markdown("#### N-gram Analysis")
+                    st.info("N-grams are contiguous sequences of N items (words) from a given sample of text. They are useful for understanding common phrases.")
+                    
+                    n_gram_value = st.slider("Select N for N-grams", 2, 3, 2) # Bigrams and Trigrams
+                    top_n_grams = st.slider("Top N N-grams to display", 5, 50, 20)
+
+                    if st.button(f"Generate Top {top_n_grams} {n_gram_value}-grams"):
+                        if text_corpus.strip():
+                            try:
+                                words = re.findall(r'\b\w+\b', text_corpus.lower())
+                                if len(words) < n_gram_value:
+                                    st.warning(f"Not enough words to form {n_gram_value}-grams.")
+                                else:
+                                    n_grams = [' '.join(words[i:i+n_gram_value]) for i in range(len(words) - n_gram_value + 1)]
+                                    n_gram_counts = Counter(n_grams)
+                                    top_n_grams_df = pd.DataFrame(n_gram_counts.most_common(top_n_grams), columns=[f'{n_gram_value}-gram', 'Count'])
+                                    
+                                    fig_ngram = px.bar(top_n_grams_df, x='Count', y=f'{n_gram_value}-gram', orientation='h',
+                                                       title=f"Top {top_n_grams} {n_gram_value}-grams")
+                                    fig_ngram.update_layout(yaxis={'categoryorder':'total ascending'}, height=min(600, top_n_grams * 25 + 100))
+                                    st.plotly_chart(fig_ngram, use_container_width=True)
+                            except Exception as e:
+                                st.error(f"Error generating N-grams: {e}")
+                        else:
+                            st.info("No text to analyze for N-grams.")
 
         elif selected_eda == "🌍 Geospatial Analysis (Basic)":
             st.subheader("🌍 Geospatial Visualization")

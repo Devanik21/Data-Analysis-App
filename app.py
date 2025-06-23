@@ -3636,7 +3636,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         
         # Helper function to create a single chart
         def create_dashboard_chart(chart_num, filtered_df, numeric_cols, categorical_cols):
-            st.markdown(f"#### Chart {chart_num} Configuration")
+            st.markdown(f"#### Chart {chart_num}")
             
             # Set default index for chart type to make Chart 2 start with Line, others with Bar
             default_chart_type_index = 1 if chart_num == 2 else 0 
@@ -3659,7 +3659,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                             else:
                                 # If x_col is not numeric, use a bar chart instead
                                 fig = px.bar(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_bar_line_scatter")
                     else:
                         st.write("Not enough columns to create a Bar, Line, or Scatter chart.")
 
@@ -3667,8 +3667,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     if len(categorical_cols) > 0 and len(numeric_cols) > 0:
                         names_col = categorical_cols[0]  # Use the first categorical column for names
                         values_col = numeric_cols[(chart_num - 1) % len(numeric_cols)]  # Cycle through numeric cols for values
-                        fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}")
-                        st.plotly_chart(fig, use_container_width=True)
+                        fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}") # This was already there, but keeping it for context
+                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_pie")
                     else:
                         st.write("Need at least one categorical and one numeric column for a Pie chart.")
 
@@ -3680,8 +3680,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     x_col = filtered_df.columns[0]
                     st.write(f"Type of X Column: {filtered_df[x_col].dtype}")
                     if chart_type == "Scatter" and not pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.") # This was already there, but keeping it for context
+                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_fallback")
 
         # Loop to create 10 charts
         for i in range(1, 11): # For charts 1 to 10

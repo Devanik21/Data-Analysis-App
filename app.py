@@ -739,15 +739,18 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                 st.info("No categorical columns for bar chart.")
 
 elif selected_tool == "🔍 SQL Query Engine":
-    st.markdown('<h2 class="tool-header">🔍 Advanced SQL Query Engine</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="tool-header">🔍 Supercharged SQL Query Engine</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
-        
-        # New layout
-        main_col, side_col = st.columns([2, 1])
+
+        # Initialize session state for parameters
+        if 'sql_params' not in st.session_state:
+            st.session_state.sql_params = [{"Parameter": ":min_age", "Value": "30"}]
+
+        main_col, side_col = st.columns([3, 1])
         
         with side_col:
             st.subheader("🛠️ Tools & Info")
@@ -760,71 +763,53 @@ elif selected_tool == "🔍 SQL Query Engine":
                 })
                 st.dataframe(schema_info, use_container_width=True)
 
-            # Query Examples
-            with st.expander("💡 SQL Query Examples"):
-                st.markdown("""
-                Use these examples as a starting point. Your table is named `data`.
+            # Parameterized Queries
+            st.subheader("⚙️ Parameterized Query")
+            st.info("Define parameters (e.g., `:my_param`) and use them in your query. They will be replaced with their values before execution.")
+            edited_params = st.data_editor(
+                st.session_state.sql_params,
+                num_rows="dynamic",
+                column_config={
+                    "Parameter": st.column_config.TextColumn("Parameter", help="Parameter name, e.g., :city_name", required=True),
+                    "Value": st.column_config.TextColumn("Value", help="Value to substitute", required=True)
+                },
+                key="sql_params_editor"
+            )
+            st.session_state.sql_params = edited_params
 
-                **1. Select all columns for the first 10 rows:**
-                ```sql
-                SELECT * FROM data LIMIT 10;
-                ```
-
-                **2. Filter rows based on a condition:**
-                (Replace `your_column` and `'some_value'`)
-                ```sql
-                SELECT * FROM data WHERE your_column = 'some_value';
-                ```
-
-                **3. Group data and count occurrences:**
-                (Replace `category_column`)
-                ```sql
-                SELECT category_column, COUNT(*) as count
-                FROM data
-                GROUP BY category_column
-                ORDER BY count DESC;
-                ```
-
-                **4. Calculate an average and filter:**
-                (Replace `numeric_column` and `category_column`)
-                ```sql
-                SELECT category_column, AVG(numeric_column) as avg_value
-                FROM data
-                GROUP BY category_column;
-                ```
-                """)
             # AI Query Generator
             st.subheader("🤖 AI Query Assistant")
             if not st.session_state.gemini_model:
                 st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
             else:
-                nl_query = st.text_area(
-                    "Describe what you want to query in plain English:",
-                    placeholder="e.g., 'show me the average income by city for users older than 30, sorted by income'",
-                    height=100,
-                    key="sql_ai_query"
-                )
-                if st.button("✨ Generate SQL with AI"):
-                    if nl_query:
-                        schema_str = pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()
-                        prompt = f"""You are an expert SQL developer.
-Given a table named `data` with the following schema:
-{schema_str}
+                with st.expander("Generate SQL from Natural Language"):
+                    nl_query = st.text_area(
+                        "Describe what you want to query in plain English:",
+                        placeholder="e.g., 'show me the average income by city for users older than 30, sorted by income'",
+                        height=100,
+                        key="sql_ai_query"
+                    )
+                    if st.button("✨ Generate SQL with AI"):
+                        if nl_query:
+                            schema_str = pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()
+                            prompt = f"""You are an expert SQL developer.
+    Given a table named `data` with the following schema:
+    {schema_str}
 
-Write a SQL query to answer the following question:
-"{nl_query}"
+    Write a SQL query to answer the following question:
+    "{nl_query}"
 
-Provide only the SQL code in a single code block, without any explanation or surrounding text.
-"""
-                        generated_sql = generate_gemini_content(prompt)
-                        if generated_sql:
-                            cleaned_sql = re.sub(r"```(sql)?\n", "", generated_sql)
-                            cleaned_sql = re.sub(r"```", "", cleaned_sql).strip()
-                            st.session_state.current_query = cleaned_sql
-                            st.success("AI-generated SQL populated in the editor!")
-                            st.experimental_rerun() # Rerun to update the text_area
-                    else:
-                        st.warning("Please enter a description for the AI to generate a query.")
+    Provide only the SQL code in a single code block, without any explanation or surrounding text.
+    """
+                            generated_sql = generate_gemini_content(prompt)
+                            if generated_sql:
+                                cleaned_sql = re.sub(r"```(sql)?\n", "", generated_sql)
+                                cleaned_sql = re.sub(r"```", "", cleaned_sql).strip()
+                                st.session_state.current_query = cleaned_sql
+                                st.success("AI-generated SQL populated in the editor!")
+                                st.experimental_rerun() # Rerun to update the text_area
+                        else:
+                            st.warning("Please enter a description for the AI to generate a query.")
 
             # Query History
             st.subheader("📚 Query History")
@@ -841,37 +826,117 @@ Provide only the SQL code in a single code block, without any explanation or sur
 
         with main_col:
             st.subheader("✍️ SQL Query Editor")
-            
             query = st.text_area(
                 "Enter your SQL query here. The table is named `data`.",
-                value=st.session_state.get('current_query', 'SELECT * FROM data LIMIT 10;'),
+                value=st.session_state.get('current_query', 'SELECT * FROM data WHERE age > :min_age;'),
                 height=200,
                 key="sql_query_editor"
             )
-            st.session_state.current_query = query # Persist changes immediately
+            st.session_state.current_query = query
 
-            if st.button("🚀 Execute Query", type="primary"):
-                result, error, duration = execute_sql_query(df, query)
-                st.session_state.sql_query_duration = duration # Store duration for display
-                if error:
-                    st.session_state.sql_result = None
-                    st.error(f"SQL Error: {error}")
-                else:
-                    st.session_state.sql_result = result
-                    st.session_state.sql_history.append({
-                        'query': query,
-                        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        'rows': len(result),
-                        'duration': duration
-                    })
-                    st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
-            
+            # --- Parameter Substitution ---
+            final_query = query
+            try:
+                for param in st.session_state.sql_params:
+                    param_name = param.get("Parameter")
+                    param_value = param.get("Value")
+                    if param_name and param_value is not None:
+                        # Basic substitution: add quotes for non-numeric values and escape single quotes
+                        if not str(param_value).replace('.', '', 1).isdigit():
+                            param_value_safe = str(param_value).replace("'", "''")
+                            final_query = final_query.replace(param_name, f"'{param_value_safe}'")
+                        else:
+                            final_query = final_query.replace(param_name, str(param_value))
+                
+                if final_query != query:
+                    with st.expander("Substituted Query Preview"):
+                        st.code(final_query, language='sql')
+            except Exception as e:
+                st.error(f"Error substituting parameters: {e}")
+
+            # --- Action Buttons ---
+            b_col1, b_col2, b_col3 = st.columns(3)
+            with b_col1:
+                if st.button("🚀 Execute Query", type="primary", use_container_width=True):
+                    result, error, duration = execute_sql_query(df, final_query)
+                    st.session_state.sql_query_duration = duration
+                    if error:
+                        st.session_state.sql_result = None
+                        st.error(f"SQL Error: {error}")
+                    else:
+                        st.session_state.sql_result = result
+                        st.session_state.sql_history.append({
+                            'query': query, # Save original query with parameters
+                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'rows': len(result),
+                            'duration': duration
+                        })
+                        st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
+            with b_col2:
+                if st.button("📊 Explain Query", use_container_width=True):
+                    if final_query:
+                        explain_result, explain_error, _ = execute_sql_query(df, f"EXPLAIN {final_query}")
+                        if explain_error:
+                            st.error(f"Error explaining query: {explain_error}")
+                        else:
+                            st.subheader("🔍 Query Execution Plan (from DuckDB)")
+                            st.code(explain_result.to_string(), language='text')
+            with b_col3:
+                if st.button("🧠 Optimize with AI", use_container_width=True):
+                    if not st.session_state.gemini_model:
+                        st.warning("Enter your Google AI API Key to use this feature.")
+                    elif final_query:
+                        schema_str = pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()
+                        prompt = f"""You are a DuckDB performance tuning expert.
+Given a table named `data` with the following schema:
+{schema_str}
+
+The user has written the following SQL query:
+```sql
+{final_query}
+```
+
+Please analyze this query and provide an optimized version if possible.
+Explain the key optimizations you made and why they improve performance (e.g., filter pushdown, join order, using specific functions).
+If the query is already optimal, state that and explain why.
+Format your response using markdown.
+"""
+                        optimization_suggestion = generate_gemini_content(prompt)
+                        if optimization_suggestion:
+                            st.subheader("🤖 AI Optimization Suggestion")
+                            st.markdown(optimization_suggestion)
+
             # Display Results
             if 'sql_result' in st.session_state and st.session_state.sql_result is not None:
                 st.subheader("📊 Query Results")
                 result_df = st.session_state.sql_result
                 st.dataframe(result_df)
                 
+                # --- AI Interpretation Button ---
+                if not result_df.empty:
+                    if st.button("🤖 Interpret Results with AI"):
+                        if not st.session_state.gemini_model:
+                            st.warning("Enter your Google AI API Key to use this feature.")
+                        else:
+                            prompt = f"""You are a data analyst.
+The following SQL query was run:
+```sql
+{final_query}
+```
+It produced the following result (showing the first 10 rows):
+```
+{result_df.head(10).to_string()}
+```
+The result has a total of {len(result_df)} rows.
+
+Please provide a brief, insightful interpretation of what these results mean.
+Focus on the business or analytical implications of the findings.
+"""
+                            interpretation = generate_gemini_content(prompt)
+                            if interpretation:
+                                st.subheader("🤖 AI Result Interpretation")
+                                st.markdown(interpretation)
+
                 # Export options
                 col1, col2 = st.columns(2)
                 with col1:
@@ -890,7 +955,7 @@ Provide only the SQL code in a single code block, without any explanation or sur
                     )
 
                 # Visualization of results
-                with st.expander("🎨 Visualize Query Results", expanded=False):
+                with st.expander("🎨 Visualize Query Results", expanded=True):
                     if not result_df.empty:
                         st.markdown("Create a quick plot from your query results.")
                         
@@ -929,6 +994,7 @@ Provide only the SQL code in a single code block, without any explanation or sur
                                 st.error(f"Could not generate plot: {e}")
                     else:
                         st.info("Result is empty, nothing to visualize.")
+
 
 elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
     st.markdown('<h2 class="tool-header">📊 Advanced Exploratory Data Analysis</h2>', unsafe_allow_html=True)

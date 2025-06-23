@@ -760,6 +760,39 @@ elif selected_tool == "🔍 SQL Query Engine":
                 })
                 st.dataframe(schema_info, use_container_width=True)
 
+            # Query Examples
+            with st.expander("💡 SQL Query Examples"):
+                st.markdown("""
+                Use these examples as a starting point. Your table is named `data`.
+
+                **1. Select all columns for the first 10 rows:**
+                ```sql
+                SELECT * FROM data LIMIT 10;
+                ```
+
+                **2. Filter rows based on a condition:**
+                (Replace `your_column` and `'some_value'`)
+                ```sql
+                SELECT * FROM data WHERE your_column = 'some_value';
+                ```
+
+                **3. Group data and count occurrences:**
+                (Replace `category_column`)
+                ```sql
+                SELECT category_column, COUNT(*) as count
+                FROM data
+                GROUP BY category_column
+                ORDER BY count DESC;
+                ```
+
+                **4. Calculate an average and filter:**
+                (Replace `numeric_column` and `category_column`)
+                ```sql
+                SELECT category_column, AVG(numeric_column) as avg_value
+                FROM data
+                GROUP BY category_column;
+                ```
+                """)
             # AI Query Generator
             st.subheader("🤖 AI Query Assistant")
             if not st.session_state.gemini_model:

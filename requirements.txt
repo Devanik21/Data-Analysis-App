@@ -1,12 +1,12 @@
-sql_formatter
+sql-formatter
 duckdb
 streamlit
-google.generativeai
+google-generativeai
 statsmodels
 pandas
 numpy
 plotly
-WordCloud
+wordcloud
 seaborn
 matplotlib
 scipy
@@ -15,10 +15,5 @@ openpyxl
 sqlalchemy
 requests
 beautifulsoup4
-# For reading parquet files (optional, but used in code)
 pyarrow
-# For Excel file support (already included via openpyxl, but xlsx support)
 xlrd
-# For database support (sqlite3 is built-in, but SQLAlchemy is used)
-# For JSON and time handling (built-in: json, datetime, time)
-# For warnings and re (built

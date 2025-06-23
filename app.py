@@ -3579,7 +3579,7 @@ Summarize total `sales` by `region` and `product`.
             st.dataframe(df.head(100).style.apply(lambda x: [f'background-color: {"lightcoral" if v > 0 else "lightgreen"}' if (isinstance(v, (int,float)) and x.name in [r['Column'] for r in edited_rules_cf if r['Condition']=='Greater Than' and v > pd.to_numeric(r['Value'], errors='coerce')]) else '' for v in x], axis=0))
             st.warning("Conditional formatting preview is limited for performance. Full styling would be applied on export.")
 
-elif selected_tool == "💼 Power BI Style Dashboard":
+elif selected_tool == "💼 Power BI Style Dashboard": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
@@ -3634,70 +3634,57 @@ elif selected_tool == "💼 Power BI Style Dashboard":
         st.markdown("---")
         st.subheader("📈 Dashboard Charts")
         
-        # Configure Charts
-        chart_layout_cols = st.columns(2)
-        
-        with chart_layout_cols[0]:
-            st.markdown("#### Chart 1 Configuration")
-            chart1_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key="db_chart1_type")
+        # Helper function to create a single chart configuration block
+        def create_dashboard_chart(chart_num, filtered_df, numeric_cols, categorical_cols):
+            st.markdown(f"#### Chart {chart_num} Configuration")
             
-            if chart1_type in ["Bar", "Line", "Scatter"]:
-                chart1_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key="db_chart1_x")
-                chart1_y = st.selectbox("Y-axis", numeric_cols, key="db_chart1_y")
-                chart1_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key="db_chart1_color")
-                
-                if chart1_x and chart1_y:
-                    try:
-                        if chart1_type == "Bar":
-                            fig1 = px.bar(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} by {chart1_x}")
-                        elif chart1_type == "Line":
-                            fig1 = px.line(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} over {chart1_x}")
-                        elif chart1_type == "Scatter":
-                            fig1 = px.scatter(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} vs {chart1_x}")
-                        st.plotly_chart(fig1, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error generating Chart 1: {e}")
-
-            elif chart1_type == "Pie":
-                chart1_names = st.selectbox("Names (Categories)", categorical_cols, key="db_chart1_pie_names")
-                chart1_values = st.selectbox("Values (Numeric)", numeric_cols, key="db_chart1_pie_values")
-                if chart1_names and chart1_values:
-                    try:
-                        fig1 = px.pie(filtered_df, names=chart1_names, values=chart1_values, title=f"Distribution of {chart1_values} by {chart1_names}")
-                        st.plotly_chart(fig1, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error generating Chart 1: {e}")
-
-        with chart_layout_cols[1]:
-            st.markdown("#### Chart 2 Configuration")
-            chart2_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key="db_chart2_type", index=1)
+            # Set default index for chart type to make Chart 2 start with Line, others with Bar
+            default_chart_type_index = 1 if chart_num == 2 else 0 
+            chart_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key=f"db_chart{chart_num}_type", index=default_chart_type_index)
             
-            if chart2_type in ["Bar", "Line", "Scatter"]:
-                chart2_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key="db_chart2_x")
-                chart2_y = st.selectbox("Y-axis", numeric_cols, key="db_chart2_y", index=min(1, len(numeric_cols)-1) if numeric_cols else 0)
-                chart2_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key="db_chart2_color")
+            # Determine default index for Y-axis for numeric_cols
+            default_y_index = 0
+            if numeric_cols:
+                if chart_num == 2 and len(numeric_cols) > 1:
+                    default_y_index = 1
+                elif chart_num > 2 and len(numeric_cols) > 0:
+                    # For other charts, try to pick a different numeric column if available
+                    default_y_index = (chart_num - 1) % len(numeric_cols)
+            
+            if chart_type in ["Bar", "Line", "Scatter"]:
+                chart_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key=f"db_chart{chart_num}_x")
+                chart_y = st.selectbox("Y-axis", numeric_cols, key=f"db_chart{chart_num}_y", index=default_y_index if numeric_cols else 0)
+                chart_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key=f"db_chart{chart_num}_color")
                 
-                if chart2_x and chart2_y:
+                if chart_x and chart_y:
                     try:
-                        if chart2_type == "Bar":
-                            fig2 = px.bar(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} by {chart2_x}")
-                        elif chart2_type == "Line":
-                            fig2 = px.line(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} over {chart2_x}")
-                        elif chart2_type == "Scatter":
-                            fig2 = px.scatter(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} vs {chart2_x}")
-                        st.plotly_chart(fig2, use_container_width=True)
+                        if chart_type == "Bar":
+                            fig = px.bar(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} by {chart_x}")
+                        elif chart_type == "Line":
+                            fig = px.line(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} over {chart_x}")
+                        elif chart_type == "Scatter":
+                            fig = px.scatter(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} vs {chart_x}")
+                        st.plotly_chart(fig, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Error generating Chart 2: {e}")
+                        st.error(f"Error generating Chart {chart_num}: {e}")
 
-            elif chart2_type == "Pie":
-                chart2_names = st.selectbox("Names (Categories)", categorical_cols, key="db_chart2_pie_names")
-                chart2_values = st.selectbox("Values (Numeric)", numeric_cols, key="db_chart2_pie_values")
-                if chart2_names and chart2_values:
+            elif chart_type == "Pie":
+                chart_names = st.selectbox("Names (Categories)", categorical_cols, key=f"db_chart{chart_num}_pie_names")
+                chart_values = st.selectbox("Values (Numeric)", numeric_cols, key=f"db_chart{chart_num}_pie_values", index=default_y_index if numeric_cols else 0)
+                if chart_names and chart_values:
                     try:
-                        fig2 = px.pie(filtered_df, names=chart2_names, values=chart2_values, title=f"Distribution of {chart2_values} by {chart2_names}")
-                        st.plotly_chart(fig2, use_container_width=True)
+                        fig = px.pie(filtered_df, names=chart_names, values=chart_values, title=f"Distribution of {chart_values} by {chart_names}")
+                        st.plotly_chart(fig, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Error generating Chart 2: {e}")
+                        st.error(f"Error generating Chart {chart_num}: {e}")
+
+        # Loop to create 10 charts
+        for i in range(1, 11): # For charts 1 to 10
+            if i % 2 != 0: # Start a new row for odd numbered charts
+                chart_layout_cols = st.columns(2)
+            
+            with chart_layout_cols[(i-1) % 2]: # Place in first or second column
+                create_dashboard_chart(i, filtered_df, numeric_cols, categorical_cols)
 
 elif selected_tool == "🐍 Python Advanced Analytics": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

@@ -180,6 +180,7 @@ tools = [
     "🔍 SQL Query Engine",
     "📊 Exploratory Data Analysis (EDA)",
     "📈 Excel Query Tool",
+    "💼 Power BI Style Dashboard",
     "🐍 Python Advanced Analytics",
     "🐼 Pandas Query Tool",
     "🌐 Web Scraping Tool",
@@ -3577,6 +3578,126 @@ Summarize total `sales` by `region` and `product`.
 
             st.dataframe(df.head(100).style.apply(lambda x: [f'background-color: {"lightcoral" if v > 0 else "lightgreen"}' if (isinstance(v, (int,float)) and x.name in [r['Column'] for r in edited_rules_cf if r['Condition']=='Greater Than' and v > pd.to_numeric(r['Value'], errors='coerce')]) else '' for v in x], axis=0))
             st.warning("Conditional formatting preview is limited for performance. Full styling would be applied on export.")
+
+elif selected_tool == "💼 Power BI Style Dashboard":
+    st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)
+
+    if st.session_state.df is None:
+        st.warning("Please upload data first to build a dashboard!")
+    else:
+        df = st.session_state.df
+        
+        # --- Sidebar for Filters ---
+        st.sidebar.header("Dashboard Filters")
+        
+        # Use a copy of the dataframe for filtering
+        filtered_df = df.copy()
+        
+        # Get column types
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+        
+        # Create filters for categorical columns
+        for col in categorical_cols:
+            unique_vals = ['All'] + sorted(df[col].unique().tolist())
+            selected_vals = st.sidebar.multiselect(f"Filter by {col}", unique_vals, default='All')
+            if 'All' not in selected_vals and selected_vals:
+                filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
+
+        # Create filters for numeric columns (range sliders)
+        for col in numeric_cols:
+            min_val, max_val = float(df[col].min()), float(df[col].max())
+            if min_val < max_val:
+                selected_range = st.sidebar.slider(f"Filter by {col} range", min_val, max_val, (min_val, max_val))
+                filtered_df = filtered_df[(filtered_df[col] >= selected_range[0]) & (filtered_df[col] <= selected_range[1])]
+
+        # --- Main Dashboard Area ---
+        st.subheader("📊 Key Performance Indicators (KPIs)")
+        
+        # Configure KPIs
+        kpi_cols = st.multiselect("Select up to 5 columns for KPIs", numeric_cols, default=numeric_cols[:min(5, len(numeric_cols))])
+        
+        if kpi_cols:
+            kpi_display_cols = st.columns(len(kpi_cols))
+            for i, col in enumerate(kpi_cols):
+                with kpi_display_cols[i]:
+                    # Calculate metric on the filtered dataframe
+                    total = filtered_df[col].sum()
+                    average = filtered_df[col].mean()
+                    count = filtered_df[col].count()
+                    st.metric(label=f"Total {col}", value=f"{total:,.2f}")
+                    st.metric(label=f"Average {col}", value=f"{average:,.2f}")
+                    st.metric(label=f"Count of {col}", value=f"{count:,}")
+        else:
+            st.info("Select numeric columns from the dropdown above to display KPIs.")
+
+        st.markdown("---")
+        st.subheader("📈 Dashboard Charts")
+        
+        # Configure Charts
+        chart_layout_cols = st.columns(2)
+        
+        with chart_layout_cols[0]:
+            st.markdown("#### Chart 1 Configuration")
+            chart1_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key="db_chart1_type")
+            
+            if chart1_type in ["Bar", "Line", "Scatter"]:
+                chart1_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key="db_chart1_x")
+                chart1_y = st.selectbox("Y-axis", numeric_cols, key="db_chart1_y")
+                chart1_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key="db_chart1_color")
+                
+                if chart1_x and chart1_y:
+                    try:
+                        if chart1_type == "Bar":
+                            fig1 = px.bar(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} by {chart1_x}")
+                        elif chart1_type == "Line":
+                            fig1 = px.line(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} over {chart1_x}")
+                        elif chart1_type == "Scatter":
+                            fig1 = px.scatter(filtered_df, x=chart1_x, y=chart1_y, color=None if chart1_color == 'None' else chart1_color, title=f"{chart1_y} vs {chart1_x}")
+                        st.plotly_chart(fig1, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error generating Chart 1: {e}")
+
+            elif chart1_type == "Pie":
+                chart1_names = st.selectbox("Names (Categories)", categorical_cols, key="db_chart1_pie_names")
+                chart1_values = st.selectbox("Values (Numeric)", numeric_cols, key="db_chart1_pie_values")
+                if chart1_names and chart1_values:
+                    try:
+                        fig1 = px.pie(filtered_df, names=chart1_names, values=chart1_values, title=f"Distribution of {chart1_values} by {chart1_names}")
+                        st.plotly_chart(fig1, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error generating Chart 1: {e}")
+
+        with chart_layout_cols[1]:
+            st.markdown("#### Chart 2 Configuration")
+            chart2_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key="db_chart2_type", index=1)
+            
+            if chart2_type in ["Bar", "Line", "Scatter"]:
+                chart2_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key="db_chart2_x")
+                chart2_y = st.selectbox("Y-axis", numeric_cols, key="db_chart2_y", index=min(1, len(numeric_cols)-1) if numeric_cols else 0)
+                chart2_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key="db_chart2_color")
+                
+                if chart2_x and chart2_y:
+                    try:
+                        if chart2_type == "Bar":
+                            fig2 = px.bar(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} by {chart2_x}")
+                        elif chart2_type == "Line":
+                            fig2 = px.line(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} over {chart2_x}")
+                        elif chart2_type == "Scatter":
+                            fig2 = px.scatter(filtered_df, x=chart2_x, y=chart2_y, color=None if chart2_color == 'None' else chart2_color, title=f"{chart2_y} vs {chart2_x}")
+                        st.plotly_chart(fig2, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error generating Chart 2: {e}")
+
+            elif chart2_type == "Pie":
+                chart2_names = st.selectbox("Names (Categories)", categorical_cols, key="db_chart2_pie_names")
+                chart2_values = st.selectbox("Values (Numeric)", numeric_cols, key="db_chart2_pie_values")
+                if chart2_names and chart2_values:
+                    try:
+                        fig2 = px.pie(filtered_df, names=chart2_names, values=chart2_values, title=f"Distribution of {chart2_values} by {chart2_names}")
+                        st.plotly_chart(fig2, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Error generating Chart 2: {e}")
 
 elif selected_tool == "🐍 Python Advanced Analytics": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

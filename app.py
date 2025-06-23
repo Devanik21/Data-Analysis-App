@@ -32,6 +32,7 @@ from typing import Optional, Dict, Any, List
 import google.generativeai as genai
 from wordcloud import WordCloud
 
+from sql_formatter.api import format_sql
 warnings.filterwarnings('ignore')
 
 # Page Configuration
@@ -105,6 +106,8 @@ if 'gemini_model' not in st.session_state:
     st.session_state.gemini_model = None
 if 'python_plots' not in st.session_state:
     st.session_state.python_plots = []
+if 'saved_sql_queries' not in st.session_state:
+    st.session_state.saved_sql_queries = {}
 if 'python_plotly_figs' not in st.session_state:
     st.session_state.python_plotly_figs = []
 
@@ -212,14 +215,27 @@ def create_download_link(df: pd.DataFrame, filename: str = "data.csv") -> str:
 def execute_sql_query(df: pd.DataFrame, query: str) -> tuple[Optional[pd.DataFrame], Optional[str], float]:
     """Execute SQL query on dataframe using DuckDB for high performance."""
     start_time = time.time()
+    conn = duckdb.connect(database=':memory:')
+    conn.register('data', df)
+    
+    query_upper = query.strip().upper()
+    is_dml = any(query_upper.startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE'])
+
     try:
-        conn = duckdb.connect(database=':memory:')
-        conn.register('data', df)
-        result = conn.execute(query).fetchdf()
-        conn.close()
+        cursor = conn.execute(query)
         duration = time.time() - start_time
-        return result, None, duration
+        
+        if is_dml:
+            # For DML, the "result" is the entire updated table.
+            result_df = conn.execute('SELECT * FROM data').fetchdf()
+        else:
+            # For SELECT, EXPLAIN, etc., fetch the result from the original cursor
+            result_df = cursor.fetchdf()
+            
+        conn.close()
+        return result_df, None, duration
     except Exception as e:
+        conn.close()
         duration = time.time() - start_time
         return None, str(e), duration
 
@@ -739,7 +755,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                 st.info("No categorical columns for bar chart.")
 
 elif selected_tool == "🔍 SQL Query Engine":
-    st.markdown('<h2 class="tool-header">🔍 Supercharged SQL Query Engine</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="tool-header">⚡ Ultimate SQL Query Engine</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
         st.warning("Please upload data first!")
@@ -749,6 +765,8 @@ elif selected_tool == "🔍 SQL Query Engine":
         # Initialize session state for parameters
         if 'sql_params' not in st.session_state:
             st.session_state.sql_params = [{"Parameter": ":min_age", "Value": "30"}]
+        if 'saved_sql_queries' not in st.session_state:
+            st.session_state.saved_sql_queries = {}
 
         main_col, side_col = st.columns([3, 1])
         
@@ -823,12 +841,40 @@ elif selected_tool == "🔍 SQL Query Engine":
                             st.experimental_rerun()
             else:
                 st.info("No queries run in this session yet.")
+            
+            # Saved Queries
+            st.subheader("💾 Saved Queries")
+            query_name = st.text_input("Query Name to Save/Delete", key="sql_save_name")
+            s_col1, s_col2 = st.columns(2)
+            with s_col1:
+                if st.button("Save Query", use_container_width=True):
+                    if query_name:
+                        st.session_state.saved_sql_queries[query_name] = st.session_state.current_query
+                        st.success(f"Query '{query_name}' saved!")
+                    else:
+                        st.warning("Please enter a name to save the query.")
+            with s_col2:
+                if st.button("Delete Query", use_container_width=True):
+                    if query_name and query_name in st.session_state.saved_sql_queries:
+                        del st.session_state.saved_sql_queries[query_name]
+                        st.success(f"Query '{query_name}' deleted!")
+                        st.experimental_rerun()
+                    else:
+                        st.warning("Enter the name of an existing query to delete.")
+
+            if st.session_state.saved_sql_queries:
+                saved_query_to_load = st.selectbox("Load a saved query", options=[""] + list(st.session_state.saved_sql_queries.keys()))
+                if saved_query_to_load:
+                    st.session_state.current_query = st.session_state.saved_sql_queries[saved_query_to_load]
+                    st.info(f"Query '{saved_query_to_load}' loaded into editor.")
+                    st.experimental_rerun()
 
         with main_col:
             st.subheader("✍️ SQL Query Editor")
+            st.info("You can run `SELECT` statements to query data, or DML statements like `UPDATE`, `INSERT`, `DELETE` to modify the in-memory DataFrame for this session.")
             query = st.text_area(
                 "Enter your SQL query here. The table is named `data`.",
-                value=st.session_state.get('current_query', 'SELECT * FROM data WHERE age > :min_age;'),
+                value=st.session_state.get('current_query', "SELECT * FROM data WHERE age > :min_age;"),
                 height=200,
                 key="sql_query_editor"
             )
@@ -855,23 +901,33 @@ elif selected_tool == "🔍 SQL Query Engine":
                 st.error(f"Error substituting parameters: {e}")
 
             # --- Action Buttons ---
-            b_col1, b_col2, b_col3 = st.columns(3)
+            b_col1, b_col2, b_col3, b_col4 = st.columns(4)
             with b_col1:
                 if st.button("🚀 Execute Query", type="primary", use_container_width=True):
-                    result, error, duration = execute_sql_query(df, final_query)
+                    is_dml = any(final_query.strip().upper().startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE'])
+                    
+                    result, error, duration = execute_sql_query(df, final_query) # result is new full df for DML
                     st.session_state.sql_query_duration = duration
                     if error:
                         st.session_state.sql_result = None
                         st.error(f"SQL Error: {error}")
                     else:
-                        st.session_state.sql_result = result
-                        st.session_state.sql_history.append({
-                            'query': query, # Save original query with parameters
-                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            'rows': len(result),
-                            'duration': duration
-                        })
-                        st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
+                        if is_dml:
+                            st.session_state.df = result # Update the main dataframe
+                            st.session_state.sql_result = None # Clear previous query results
+                            st.success(f"DML query executed successfully in {duration:.4f}s. The data has been updated.")
+                            st.info("The main DataFrame has been updated. Rerunning to reflect changes across the app.")
+                            st.experimental_rerun()
+                        else:
+                            # This is a SELECT query
+                            st.session_state.sql_result = result
+                            st.session_state.sql_history.append({
+                                'query': query, # Save original query with parameters
+                                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                'rows': len(result),
+                                'duration': duration
+                            })
+                            st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
             with b_col2:
                 if st.button("📊 Explain Query", use_container_width=True):
                     if final_query:
@@ -905,6 +961,15 @@ Format your response using markdown.
                         if optimization_suggestion:
                             st.subheader("🤖 AI Optimization Suggestion")
                             st.markdown(optimization_suggestion)
+            with b_col4:
+                if st.button("🎨 Format Query", use_container_width=True):
+                    if query:
+                        try:
+                            formatted_query = format_sql(query)
+                            st.session_state.current_query = formatted_query
+                            st.experimental_rerun()
+                        except Exception as e:
+                            st.error(f"Could not format query: {e}")
 
             # Display Results
             if 'sql_result' in st.session_state and st.session_state.sql_result is not None:

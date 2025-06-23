@@ -3634,7 +3634,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         st.markdown("---")
         st.subheader("📈 Dashboard Charts")
         
-        # Helper function to create a single chart configuration block
+        # Helper function to create a single chart
         def create_dashboard_chart(chart_num, filtered_df, numeric_cols, categorical_cols):
             st.markdown(f"#### Chart {chart_num} Configuration")
             
@@ -3642,41 +3642,46 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             default_chart_type_index = 1 if chart_num == 2 else 0 
             chart_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key=f"db_chart{chart_num}_type", index=default_chart_type_index)
             
-            # Determine default index for Y-axis for numeric_cols
-            default_y_index = 0
-            if numeric_cols:
-                if chart_num == 2 and len(numeric_cols) > 1:
-                    default_y_index = 1
-                elif chart_num > 2 and len(numeric_cols) > 0:
-                    # For other charts, try to pick a different numeric column if available
-                    default_y_index = (chart_num - 1) % len(numeric_cols)
-            
-            if chart_type in ["Bar", "Line", "Scatter"]:
-                chart_x = st.selectbox("X-axis", filtered_df.columns.tolist(), key=f"db_chart{chart_num}_x")
-                chart_y = st.selectbox("Y-axis", numeric_cols, key=f"db_chart{chart_num}_y", index=default_y_index if numeric_cols else 0)
-                chart_color = st.selectbox("Color by (optional)", ['None'] + categorical_cols, key=f"db_chart{chart_num}_color")
-                
-                if chart_x and chart_y:
-                    try:
-                        if chart_type == "Bar":
-                            fig = px.bar(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} by {chart_x}")
-                        elif chart_type == "Line":
-                            fig = px.line(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} over {chart_x}")
-                        elif chart_type == "Scatter":
-                            fig = px.scatter(filtered_df, x=chart_x, y=chart_y, color=None if chart_color == 'None' else chart_color, title=f"{chart_y} vs {chart_x}")
-                        st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error generating Chart {chart_num}: {e}")
+            try:
+                if chart_type in ["Bar", "Line", "Scatter"]:
+                    if len(numeric_cols) > 0 and len(filtered_df.columns) > 1:
+                        x_col = filtered_df.columns[0]  # Default x-axis
+                        y_col = numeric_cols[(chart_num - 1) % len(numeric_cols)]  # Cycle through numeric cols for y-axis
+                        color_col = categorical_cols[0] if len(categorical_cols) > 0 else None  # Use first categorical col for color if available
 
-            elif chart_type == "Pie":
-                chart_names = st.selectbox("Names (Categories)", categorical_cols, key=f"db_chart{chart_num}_pie_names")
-                chart_values = st.selectbox("Values (Numeric)", numeric_cols, key=f"db_chart{chart_num}_pie_values", index=default_y_index if numeric_cols else 0)
-                if chart_names and chart_values:
-                    try:
-                        fig = px.pie(filtered_df, names=chart_names, values=chart_values, title=f"Distribution of {chart_values} by {chart_names}")
+                        if chart_type == "Bar":
+                            fig = px.bar(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
+                        elif chart_type == "Line":
+                            fig = px.line(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} over {x_col}")
+                        elif chart_type == "Scatter":
+                            if pd.api.types.is_numeric_dtype(filtered_df[x_col]):
+                                fig = px.scatter(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
+                            else:
+                                # If x_col is not numeric, use a bar chart instead
+                                fig = px.bar(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
                         st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error generating Chart {chart_num}: {e}")
+                    else:
+                        st.write("Not enough columns to create a Bar, Line, or Scatter chart.")
+
+                elif chart_type == "Pie":
+                    if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                        names_col = categorical_cols[0]  # Use the first categorical column for names
+                        values_col = numeric_cols[(chart_num - 1) % len(numeric_cols)]  # Cycle through numeric cols for values
+                        fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}")
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.write("Need at least one categorical and one numeric column for a Pie chart.")
+
+            except Exception as e:
+                st.error(f"Error generating Chart {chart_num}: {e}")
+                st.write(f"Numeric Columns: {numeric_cols}")
+                st.write(f"Categorical Columns: {categorical_cols}")
+                if len(numeric_cols) > 0 and len(filtered_df.columns) > 1:
+                    x_col = filtered_df.columns[0]
+                    st.write(f"Type of X Column: {filtered_df[x_col].dtype}")
+                    if chart_type == "Scatter" and not pd.api.types.is_numeric_dtype(filtered_df[x_col]):
+                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.")
+                        st.plotly_chart(fig, use_container_width=True)
 
         # Loop to create 10 charts
         for i in range(1, 11): # For charts 1 to 10

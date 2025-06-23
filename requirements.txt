@@ -1,5 +1,4 @@
-
-format_sql
+sql_formatter
 duckdb
 streamlit
 google.generativeai

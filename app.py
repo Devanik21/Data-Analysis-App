@@ -2599,9 +2599,9 @@ Summarize total `sales` by `region` and `product`.
             "Conditional Aggregation": ["SUMIFS/COUNTIFS/AVERAGEIFS (New)", "SUMIF", "COUNTIF", "AVERAGEIF"],
             "Filtering & Sorting": ["Advanced Filter (New)", "SORT"],
             "Pivoting & Grouping": ["PIVOT", "GROUPBY"],
-            "Text Manipulation": ["CONCATENATE", "SPLIT", "Text: LEFT/RIGHT/MID", "Text: FIND/REPLACE", "Text: TRIM/UPPER/LOWER/LEN"],
-            "Math & Statistical": ["Math: ROUND/ABS/SQRT", "Math: POWER/MOD", "Statistical: RANK/PERCENTILE"],
-            "Logical & Data Shaping": ["Logical: IF (Conditional Column)", "Data: Transpose", "Data: Fill Down/Up", "Date/Time: Extract Component"],
+            "Text Manipulation": ["CONCATENATE", "SPLIT", "Text: LEFT/RIGHT/MID", "Text: FIND/REPLACE", "Text: TRIM/UPPER/LOWER/LEN", "Text: REGEXMATCH (New)", "Text: REGEXREPLACE (New)", "Text: TEXTJOIN (New)"],
+            "Math & Statistical": ["Math: ROUND/ABS/SQRT", "Math: POWER/MOD", "Statistical: RANK/PERCENTILE", "Statistical: UNIQUE (New)"],
+            "Logical & Data Shaping": ["Logical: IF (Conditional Column)", "Data: Transpose", "Data: Fill Down/Up", "Date/Time: Extract Component", "Data: Custom Column from Row Logic (New)"],
             "Advanced Tools": ["Goal Seek (New)", "Conditional Formatting (New)"]
         }
 
@@ -2767,9 +2767,9 @@ Summarize total `sales` by `region` and `product`.
                 st.session_state.filter_rules,
                 num_rows="dynamic",
                 column_config={
-                    "Logic": st.column_config.SelectboxColumn("Logic", help="How to combine with the previous rule", options=["AND", "OR"], required=True),
-                    "Column": st.column_config.SelectboxColumn("Column", help="Column to filter", options=df.columns.tolist(), required=True),
-                    "Condition": st.column_config.SelectboxColumn("Condition", help="The filter condition", options=["Contains", "Does Not Contain", "Equals", "Not Equal To", "Greater Than", "Less Than", "Is Null", "Is Not Null"], required=True),
+                    "Logic": st.column_config.SelectboxColumn("Logic", help="How to combine with the previous rule", options=["AND", "OR"], default="AND", required=True),
+                    "Column": st.column_config.SelectboxColumn("Column", help="Column to filter", options=df.columns.tolist(), default=df.columns[0], required=True),
+                    "Condition": st.column_config.SelectboxColumn("Condition", help="The filter condition", options=["Contains", "Does Not Contain", "Equals", "Not Equal To", "Greater Than", "Less Than", "Is Null", "Is Not Null", "Is in List (comma-separated)", "Is Not in List (comma-separated)"], default="Contains", required=True),
                     "Value": st.column_config.TextColumn("Value", help="Value for the condition (not needed for Is Null/Is Not Null)")
                 },
                 key="excel_filter_rules_editor"
@@ -2795,6 +2795,16 @@ Summarize total `sales` by `region` and `product`.
                                 current_mask = df[col].isnull()
                             elif cond == "Is Not Null":
                                 current_mask = df[col].notnull()
+                            elif cond == "Is in List (comma-separated)":
+                                values_list = [v.strip() for v in val.split(',')]
+                                current_mask = df[col].astype(str).isin(values_list)
+                            elif cond == "Is Not in List (comma-separated)":
+                                values_list = [v.strip() for v in val.split(',')]
+                                current_mask = ~df[col].astype(str).isin(values_list)
+                            # Ensure numeric comparison for numeric conditions
+                            elif cond in ["Greater Than", "Less Than"] and not pd.api.types.is_numeric_dtype(df[col]):
+                                st.warning(f"Column '{col}' is not numeric. Skipping numeric comparison for rule {i+1}.")
+                                continue
                             elif cond == "Contains":
                                 current_mask = df[col].astype(str).str.contains(val, case=False, na=False)
                             elif cond == "Does Not Contain":
@@ -3119,6 +3129,111 @@ Summarize total `sales` by `region` and `product`.
 
                         except Exception as e:
                             st.error(f"Error applying text formatting: {str(e)}")
+
+        elif operation == "Text: REGEXMATCH (New)":
+            st.subheader("📝 REGEXMATCH (New)")
+            st.info("Creates a new boolean column indicating if the text in a selected column matches a given regular expression pattern.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                text_col_rm = st.selectbox("Select Text Column", df.columns.tolist(), key="text_rm_col")
+                regex_pattern_rm = st.text_input("Regular Expression Pattern:", value="^A.*", help="e.g., '^A.*' for text starting with 'A'", key="text_rm_pattern")
+                new_col_name_rm = st.text_input("New Column Name:", value=f"{text_col_rm}_matches_regex", key="text_rm_new_col")
+
+                if st.button("Execute REGEXMATCH", key="excel_execute_regexmatch"):
+                    if not regex_pattern_rm.strip() or not new_col_name_rm.strip():
+                        st.error("Please provide a regex pattern and a new column name.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Ensure column is string type and handle NaNs
+                            text_series = df_copy[text_col_rm].astype(str).fillna('')
+                            df_copy[new_col_name_rm] = text_series.str.contains(regex_pattern_rm, regex=True, na=False)
+                            
+                            st.success(f"Applied REGEXMATCH to '{text_col_rm}'. Created '{new_col_name_rm}'.")
+                            st.dataframe(df_copy[[text_col_rm, new_col_name_rm]].head())
+                            st.session_state.df = df_copy # Update main DataFrame
+                        except Exception as e:
+                            st.error(f"Error applying REGEXMATCH: {str(e)}")
+
+        elif operation == "Text: REGEXREPLACE (New)":
+            st.subheader("📝 REGEXREPLACE (New)")
+            st.info("Replaces substrings in a selected column that match a regular expression pattern with a specified replacement string.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                text_col_rr = st.selectbox("Select Text Column", df.columns.tolist(), key="text_rr_col")
+                regex_pattern_rr = st.text_input("Regular Expression Pattern to Find:", value="[0-9]+", help="e.g., '[0-9]+' to find numbers", key="text_rr_pattern")
+                replacement_str_rr = st.text_input("Replacement String:", value="", help="e.g., '' to remove matches", key="text_rr_replacement")
+                new_col_name_rr = st.text_input("New Column Name:", value=f"{text_col_rr}_regex_replaced", key="text_rr_new_col")
+
+                if st.button("Execute REGEXREPLACE", key="excel_execute_regexreplace"):
+                    if not regex_pattern_rr.strip() or not new_col_name_rr.strip():
+                        st.error("Please provide a regex pattern and a new column name.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Ensure column is string type and handle NaNs
+                            text_series = df_copy[text_col_rr].astype(str).fillna('')
+                            df_copy[new_col_name_rr] = text_series.str.replace(regex_pattern_rr, replacement_str_rr, regex=True)
+                            
+                            st.success(f"Applied REGEXREPLACE to '{text_col_rr}'. Created '{new_col_name_rr}'.")
+                            st.dataframe(df_copy[[text_col_rr, new_col_name_rr]].head())
+                            st.session_state.df = df_copy # Update main DataFrame
+                        except Exception as e:
+                            st.error(f"Error applying REGEXREPLACE: {str(e)}")
+
+        elif operation == "Text: TEXTJOIN (New)":
+            st.subheader("📝 TEXTJOIN (New)")
+            st.info("Combines text from multiple selected columns into a single new column, using a specified delimiter.")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                cols_to_textjoin = st.multiselect("Select Columns to Join", df.columns.tolist(), key="text_tj_cols")
+                delimiter_tj = st.text_input("Delimiter:", value=" ", key="text_tj_delimiter")
+                ignore_empty_tj = st.checkbox("Ignore Empty Cells", value=True, key="text_tj_ignore_empty")
+                new_col_name_tj = st.text_input("New Column Name:", value="Joined_Text", key="text_tj_new_col")
+
+                if st.button("Execute TEXTJOIN", key="excel_execute_textjoin"):
+                    if not cols_to_textjoin or not new_col_name_tj.strip():
+                        st.error("Please select columns to join and provide a new column name.")
+                    else:
+                        try:
+                            df_copy = df.copy()
+                            # Convert selected columns to string, handle NaNs
+                            temp_df = df_copy[cols_to_textjoin].astype(str).fillna('')
+                            
+                            if ignore_empty_tj:
+                                # Replace empty strings with NaN so dropna works
+                                temp_df = temp_df.replace('', np.nan)
+                                df_copy[new_col_name_tj] = temp_df.apply(lambda x: delimiter_tj.join(x.dropna()), axis=1)
+                            else:
+                                df_copy[new_col_name_tj] = temp_df.apply(lambda x: delimiter_tj.join(x), axis=1)
+                            
+                            st.success(f"Applied TEXTJOIN to {len(cols_to_textjoin)} columns. Created '{new_col_name_tj}'.")
+                            st.dataframe(df_copy[[*cols_to_textjoin, new_col_name_tj]].head())
+                            st.session_state.df = df_copy # Update main DataFrame
+                        except Exception as e:
+                            st.error(f"Error applying TEXTJOIN: {str(e)}")
+
+        elif operation == "Statistical: UNIQUE (New)":
+            st.subheader("📊 UNIQUE (New)")
+            st.info("Extracts and displays unique values from selected column(s).")
+            if df.empty:
+                st.warning("DataFrame is empty.")
+            else:
+                cols_for_unique = st.multiselect("Select Column(s) for Unique Values", df.columns.tolist(), key="stat_unique_cols")
+                
+                if st.button("Get Unique Values", key="excel_get_unique"):
+                    if not cols_for_unique:
+                        st.warning("Please select at least one column.")
+                    else:
+                        try:
+                            unique_df = df[cols_for_unique].drop_duplicates().reset_index(drop=True)
+                            st.success(f"Found {len(unique_df)} unique combination(s).")
+                            st.dataframe(unique_df)
+                        except Exception as e:
+                            st.error(f"Error getting unique values: {str(e)}")
 
         elif operation == "Math: ROUND/ABS/SQRT":
             st.subheader("🧮 Math Operations (ROUND, ABS, SQRT)")

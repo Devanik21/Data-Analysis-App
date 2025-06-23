@@ -67,6 +67,11 @@ st.markdown("""
         padding-bottom: 0.5rem;
         font-weight: 600;
     }
+    /* Specific adjustments for dark background */
+    .css-18e3th9 { /* Main content area */
+        background-color: #1e1e1e; /* Dark background */
+        color: #e0e0e0; /* Light text */
+    }
     .metric-card {
         background-color: #ffffff; /* White cards for metrics */
         padding: 1rem;
@@ -175,6 +180,7 @@ tools = [
     "🔍 SQL Query Engine",
     "📊 Exploratory Data Analysis (EDA)",
     "📈 Excel Query Tool",
+    "💼 Power BI Style Dashboard", # Added this line
     "🐍 Python Advanced Analytics",
     "🐼 Pandas Query Tool",
     "🌐 Web Scraping Tool",
@@ -2543,7 +2549,7 @@ fig_tsne.show() # In Streamlit, you'd use st.plotly_chart(fig_tsne)
                                     st.error(f"Error creating interaction feature: {e}")
                             else:
                                 st.warning("Please select two distinct columns and provide a new column name.")
-
+        
                 # Placeholder for Text Analysis and Geospatial Analysis within EDA if relevant columns are detected
                 # These would require more specific libraries and checks (e.g., for text: nltk, spacy; for geo: geopandas, folium)
 
@@ -3129,7 +3135,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error applying text formatting: {str(e)}")
 
-        elif operation == "Text: REGEXMATCH (New)":
+        elif operation == "Text: REGEXMATCH (New)": # This was already there, but keeping it for context
             st.subheader("📝 REGEXMATCH (New)")
             st.info("Creates a new boolean column indicating if the text in a selected column matches a given regular expression pattern.")
             if df.empty:
@@ -3155,7 +3161,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error applying REGEXMATCH: {str(e)}")
 
-        elif operation == "Text: REGEXREPLACE (New)":
+        elif operation == "Text: REGEXREPLACE (New)": # This was already there, but keeping it for context
             st.subheader("📝 REGEXREPLACE (New)")
             st.info("Replaces substrings in a selected column that match a regular expression pattern with a specified replacement string.")
             if df.empty:
@@ -3182,7 +3188,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error applying REGEXREPLACE: {str(e)}")
 
-        elif operation == "Text: TEXTJOIN (New)":
+        elif operation == "Text: TEXTJOIN (New)": # This was already there, but keeping it for context
             st.subheader("📝 TEXTJOIN (New)")
             st.info("Combines text from multiple selected columns into a single new column, using a specified delimiter.")
             if df.empty:
@@ -3215,7 +3221,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error applying TEXTJOIN: {str(e)}")
 
-        elif operation == "Statistical: UNIQUE (New)":
+        elif operation == "Statistical: UNIQUE (New)": # This was already there, but keeping it for context
             st.subheader("📊 UNIQUE (New)")
             st.info("Extracts and displays unique values from selected column(s).")
             if df.empty:
@@ -3234,7 +3240,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error getting unique values: {str(e)}")
 
-        elif operation == "Math: ROUND/ABS/SQRT":
+        elif operation == "Math: ROUND/ABS/SQRT": # This was already there, but keeping it for context
             st.subheader("🧮 Math Operations (ROUND, ABS, SQRT)")
             if df.empty:
                 st.warning("DataFrame is empty.")
@@ -3279,7 +3285,7 @@ Summarize total `sales` by `region` and `product`.
                         except Exception as e:
                             st.error(f"Error applying math operation: {str(e)}")
 
-        elif operation == "Math: POWER/MOD":
+        elif operation == "Math: POWER/MOD": # This was already there, but keeping it for context
             st.subheader("🧮 Math Operations (POWER, MOD)")
             if df.empty:
                 st.warning("DataFrame is empty.")
@@ -3326,7 +3332,7 @@ Summarize total `sales` by `region` and `product`.
                             except Exception as e:
                                 st.error(f"Error applying math operation: {str(e)}")
 
-        elif operation == "Statistical: RANK/PERCENTILE":
+        elif operation == "Statistical: RANK/PERCENTILE": # This was already there, but keeping it for context
             st.subheader("📊 Statistical Operations (RANK, PERCENTILE)")
             if df.empty:
                 st.warning("DataFrame is empty.")
@@ -3373,7 +3379,7 @@ Summarize total `sales` by `region` and `product`.
                             except Exception as e:
                                 st.error(f"Error applying statistical operation: {str(e)}")
 
-        elif operation == "Logical: IF (Conditional Column)":
+        elif operation == "Logical: IF (Conditional Column)": # This was already there, but keeping it for context
             st.subheader("🧠 Logical IF (Create Conditional Column)")
             st.info("Creates a new column based on a condition applied to another column.")
             if df.empty:
@@ -3408,7 +3414,7 @@ Summarize total `sales` by `region` and `product`.
                             st.error(f"Error applying IF logic: {str(e)}")
                             st.info("Ensure your condition logic is valid Python syntax for a boolean expression on a Pandas Series.")
 
-        elif operation == "Data: Transpose":
+        elif operation == "Data: Transpose": # This was already there, but keeping it for context
             st.subheader("↔️ Transpose DataFrame")
             st.info("Swaps rows and columns. The original index becomes columns, and original columns become the index.")
             if df.empty:
@@ -3423,7 +3429,7 @@ Summarize total `sales` by `region` and `product`.
                     except Exception as e:
                         st.error(f"Error transposing DataFrame: {str(e)}")
 
-        elif operation == "Data: Fill Down/Up":
+        elif operation == "Data: Fill Down/Up": # This was already there, but keeping it for context
             st.subheader("💧 Fill Missing Values (Fill Down/Up)")
             st.info("Fills NaN values using the previous (Fill Down) or next (Fill Up) valid observation.")
             if df.empty:
@@ -3447,7 +3453,7 @@ Summarize total `sales` by `region` and `product`.
                     except Exception as e:
                         st.error(f"Error applying fill operation: {str(e)}")
 
-        elif operation == "Date/Time: Extract Component":
+        elif operation == "Date/Time: Extract Component": # This was already there, but keeping it for context
             st.subheader("⏰ Extract Date/Time Component")
             st.info("Extracts components like Year, Month, Day, Hour, etc., from a datetime column.")
             if df.empty:
@@ -3477,7 +3483,7 @@ Summarize total `sales` by `region` and `product`.
                             except Exception as e:
                                 st.error(f"Error extracting datetime component: {str(e)}")
 
-        elif operation == "Goal Seek (New)":
+        elif operation == "Goal Seek (New)": # This was already there, but keeping it for context
             st.subheader("🎯 Goal Seek")
             st.info("Find an input value (`x`) for a formula to achieve a desired target value. This uses an iterative solver.")
             st.warning("⚠️ This tool uses `eval()` to process the formula, which can be a security risk. Use with trusted data and formulas only.")
@@ -3542,7 +3548,7 @@ Summarize total `sales` by `region` and `product`.
                             st.error(f"An error occurred during Goal Seek: {e}")
                             st.info("Check if your formula is valid and the columns exist.")
 
-        elif operation == "Conditional Formatting (New)":
+        elif operation == "Conditional Formatting (New)": # This was already there, but keeping it for context
             st.subheader("🎨 Conditional Formatting")
             st.info("Define rules to visually style your data. The formatting is applied to the displayed table below.")
 
@@ -3573,7 +3579,7 @@ Summarize total `sales` by `region` and `product`.
             st.dataframe(df.head(100).style.apply(lambda x: [f'background-color: {"lightcoral" if v > 0 else "lightgreen"}' if (isinstance(v, (int,float)) and x.name in [r['Column'] for r in edited_rules_cf if r['Condition']=='Greater Than' and v > pd.to_numeric(r['Value'], errors='coerce')]) else '' for v in x], axis=0))
             st.warning("Conditional formatting preview is limited for performance. Full styling would be applied on export.")
 
-elif selected_tool == "💼 Power BI Dashboard":
+elif selected_tool == "💼 Power BI Style Dashboard": # New Dashboard Implementation
     st.markdown('<h2 class="tool-header">💼 Power BI Style Dashboard</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
@@ -3589,7 +3595,7 @@ elif selected_tool == "💼 Power BI Dashboard":
             lat_col = next((c for c in df.columns if 'lat' in c.lower()), None)
             lon_col = next((c for c in df.columns if 'lon' in c.lower() or 'lng' in c.lower()), None)
 
-            px.defaults.template = "plotly_white" # Set a clean theme
+            px.defaults.template = "plotly_dark" # Set dark theme
             
             # --- Dashboard Filters ---
             st.subheader(" interactivity Dashboard Filters")            
@@ -3630,7 +3636,7 @@ elif selected_tool == "💼 Power BI Dashboard":
                 row1_cols = st.columns(3)
                 with row1_cols[0]:
                     if date_cols and numeric_cols:
-                        time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index()
+                        time_df = filtered_df.set_index(date_cols[0])[numeric_cols[0]].resample('M').mean().reset_index(names=date_cols[0])
                         fig = px.line(time_df, x=date_cols[0], y=numeric_cols[0], title=f"Monthly Avg of {numeric_cols[0]}", markers=True)
                         st.plotly_chart(fig, use_container_width=True)
                     else: st.info("Time series plot requires a date and a numeric column.")
@@ -3732,7 +3738,7 @@ elif selected_tool == "💼 Power BI Dashboard":
                 st.error(f"An error occurred while generating the dashboard: {e}")
                 st.info("This can happen if the filtered data is empty or unsuitable for a specific plot. Try adjusting the filters.")
                 
-elif selected_tool == "🐍 Python Advanced Analytics":
+elif selected_tool == "🐍 Python Advanced Analytics": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)
 
     # --- Pandas Query Examples ---

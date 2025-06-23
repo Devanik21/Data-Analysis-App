@@ -29,10 +29,8 @@ import re
 import json
 import pickle
 from typing import Optional, Dict, Any, List
-import google.generativeai as genai
 from wordcloud import WordCloud
 
-from sql_formatter.api import format_sql
 warnings.filterwarnings('ignore')
 
 # Page Configuration
@@ -961,15 +959,10 @@ Format your response using markdown.
                         if optimization_suggestion:
                             st.subheader("🤖 AI Optimization Suggestion")
                             st.markdown(optimization_suggestion)
-            with b_col4:
-                if st.button("🎨 Format Query", use_container_width=True):
-                    if query:
-                        try:
-                            formatted_query = format_sql(query)
-                            st.session_state.current_query = formatted_query
-                            st.experimental_rerun()
-                        except Exception as e:
-                            st.error(f"Could not format query: {e}")
+            # The 'Format Query' button functionality has been removed as per the request
+            # to remove dependency on 'sql_formatter.api'.
+            # The b_col4 column is now empty.
+            with b_col4: pass
 
             # Display Results
             if 'sql_result' in st.session_state and st.session_state.sql_result is not None:

@@ -3638,39 +3638,122 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         def create_dashboard_chart(chart_num, filtered_df, numeric_cols, categorical_cols):
             st.markdown(f"#### Chart {chart_num}")
             
-            # Set default index for chart type to make Chart 2 start with Line, others with Bar
-            default_chart_type_index = 1 if chart_num == 2 else 0 
-            chart_type = st.selectbox("Chart Type", ["Bar", "Line", "Pie", "Scatter"], key=f"db_chart{chart_num}_type", index=default_chart_type_index)
-            
-            try:
-                if chart_type in ["Bar", "Line", "Scatter"]:
-                    if len(numeric_cols) > 0 and len(filtered_df.columns) > 1:
-                        x_col = filtered_df.columns[0]  # Default x-axis
-                        y_col = numeric_cols[(chart_num - 1) % len(numeric_cols)]  # Cycle through numeric cols for y-axis
-                        color_col = categorical_cols[0] if len(categorical_cols) > 0 else None  # Use first categorical col for color if available
+            # Ensure there's data to plot
+            if filtered_df.empty:
+                st.info(f"Chart {chart_num}: Filtered data is empty.")
+                return
 
-                        if chart_type == "Bar":
-                            fig = px.bar(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
-                        elif chart_type == "Line":
-                            fig = px.line(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} over {x_col}")
-                        elif chart_type == "Scatter":
-                            if pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                                fig = px.scatter(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
-                            else:
-                                # If x_col is not numeric, use a bar chart instead
-                                fig = px.bar(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
-                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_bar_line_scatter")
+            chart_type = None
+            x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
+            
+            # Helper to safely get a column from a list, cycling through
+            def get_cycled_col(col_list, index_offset):
+                if col_list:
+                    return col_list[index_offset % len(col_list)]
+                return None
+
+            # Try to create a diverse set of charts
+            # Priority: (Categorical X Numeric) -> (Numeric X Numeric) -> (Single Numeric) -> (Single Categorical)
+
+            # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
+            if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
+                    chart_type = "Bar"
+                    x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                    y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                elif chart_num % 4 == 2: # Pie Chart (Categorical for names, Numeric for values)
+                    chart_type = "Pie"
+                    names_col = get_cycled_col(categorical_cols, chart_num - 1)
+                    values_col = get_cycled_col(numeric_cols, chart_num - 1)
+                elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
+                    chart_type = "Line"
+                    x_col = get_cycled_col(categorical_cols, chart_num - 1) or get_cycled_col(filtered_df.columns.tolist(), chart_num - 1)
+                    y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
+                    chart_type = "Scatter"
+                    # Try to get two different numeric columns for scatter
+                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    y_col = get_cycled_col(numeric_cols, chart_num) if len(numeric_cols) > 1 else get_cycled_col(numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                    if x_col is None or y_col is None: # Fallback if not enough numeric for scatter
+                        chart_type = "Bar"
+                        x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+
+            # Fallback if no mix of categorical/numeric, but enough numeric
+            elif len(numeric_cols) >= 1:
+                if chart_num % 2 == 1 and len(numeric_cols) >= 2: # Scatter (Numeric X Numeric)
+                    chart_type = "Scatter"
+                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    y_col = get_cycled_col(numeric_cols, chart_num)
+                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                else: # Histogram (Single Numeric)
+                    chart_type = "Histogram"
+                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
+            
+            # Fallback if only categorical
+            elif len(categorical_cols) > 0:
+                chart_type = "Bar" # Count of categorical values
+                x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                y_col = None # Will be count
+
+            if chart_type is None:
+                st.info(f"Chart {chart_num}: Not enough suitable columns to generate a plot.")
+                return
+
+            try:
+                fig = None
+                if chart_type == "Bar":
+                    if x_col:
+                        if y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
+                            # Group by x_col and sum y_col
+                            plot_df = filtered_df.groupby(x_col, as_index=False)[y_col].sum() # Default to sum
+                            fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
+                        else:
+                            # Count occurrences of x_col
+                            value_counts = filtered_df[x_col].value_counts().reset_index()
+                            value_counts.columns = [x_col, 'Count']
+                            fig = px.bar(value_counts, x=x_col, y='Count', title=f"Count of {x_col}")
                     else:
-                        st.write("Not enough columns to create a Bar, Line, or Scatter chart.")
+                        st.info(f"Chart {chart_num}: Cannot create Bar chart without a suitable X-axis column.")
+
+                elif chart_type == "Line":
+                    if x_col and y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
+                        # Ensure x_col is sortable for line plots (e.g., datetime or numeric)
+                        if pd.api.types.is_datetime64_any_dtype(filtered_df[x_col]) or pd.api.types.is_numeric_dtype(filtered_df[x_col]):
+                            fig = px.line(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} over {x_col}")
+                        else:
+                            st.info(f"Chart {chart_num}: X-axis '{x_col}' is not suitable for Line plot (not datetime or numeric). Skipping.")
+                    else:
+                        st.info(f"Chart {chart_num}: Cannot create Line chart without suitable X and Y columns.")
+
+                elif chart_type == "Scatter":
+                    if x_col and y_col and x_col in filtered_df.columns and y_col in filtered_df.columns and \
+                       pd.api.types.is_numeric_dtype(filtered_df[x_col]) and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
+                        fig = px.scatter(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
+                    else:
+                        st.info(f"Chart {chart_num}: Cannot create Scatter chart without two suitable numeric columns.")
 
                 elif chart_type == "Pie":
-                    if len(categorical_cols) > 0 and len(numeric_cols) > 0:
-                        names_col = categorical_cols[0]  # Use the first categorical column for names
-                        values_col = numeric_cols[(chart_num - 1) % len(numeric_cols)]  # Cycle through numeric cols for values
-                        fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}") # This was already there, but keeping it for context
-                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_pie")
+                    if names_col and values_col and names_col in filtered_df.columns and values_col in filtered_df.columns and \
+                       pd.api.types.is_numeric_dtype(filtered_df[values_col]):
+                        fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}")
                     else:
-                        st.write("Need at least one categorical and one numeric column for a Pie chart.")
+                        st.info(f"Chart {chart_num}: Cannot create Pie chart without a suitable categorical 'names' and numeric 'values' column.")
+                
+                elif chart_type == "Histogram":
+                    if x_col and x_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[x_col]):
+                        fig = px.histogram(filtered_df, x=x_col, title=f"Histogram of {x_col}")
+                    else:
+info(f"Chart {chart_num}: Cannot create Histogram without a suitable numeric column.")
+
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}")
+                else:
+                    st.info(f"Chart {chart_num}: Could not generate a plot with available data and selected type.")
 
             except Exception as e:
                 st.error(f"Error generating Chart {chart_num}: {e}")
@@ -3680,8 +3763,9 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     x_col = filtered_df.columns[0]
                     st.write(f"Type of X Column: {filtered_df[x_col].dtype}")
                     if chart_type == "Scatter" and not pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.") # This was already there, but keeping it for context
-                        st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_fallback")
+                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.")
+                        # The fig might not be defined here if the error happened before fig assignment
+                        # This line is problematic if fig is not defined. Removing it as the main logic handles fallback.
 
         # Loop to create 10 charts
         for i in range(1, 11): # For charts 1 to 10

@@ -959,9 +959,7 @@ Format your response using markdown.
                         if optimization_suggestion:
                             st.subheader("🤖 AI Optimization Suggestion")
                             st.markdown(optimization_suggestion)
-            # The 'Format Query' button functionality has been removed as per the request
-            # to remove dependency on 'sql_formatter.api'.
-            # The b_col4 column is now empty.
+
             with b_col4: pass
 
             # Display Results

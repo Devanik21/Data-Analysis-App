@@ -3715,8 +3715,23 @@ elif selected_tool == "💼 Power BI Dashboard":
                     else: st.info("Stacked bar chart requires at least two categorical and one numeric column.")
 
         except Exception as e:
-            st.error(f"An error occurred while generating the dashboard: {e}")
-            st.info("This can happen if the filtered data is empty or unsuitable for a specific plot. Try adjusting the filters.")
+            if "cannot import name '_lazywhere'" in str(e) or "module 'scipy.linalg' has no attribute" in str(e):
+                st.error(f"Dashboard Error: {e}")
+                st.warning("""
+                **This looks like a library version conflict!** 
+                
+                This error typically happens when `scipy`, `numpy`, and `statsmodels` versions are incompatible. This can be common if you are using a very new or pre-release version of Python (like Python 3.12+).
+
+                **Recommended Solutions:**
+                1.  **(Best) Use a Stable Python Version:** It's highly recommended to use a stable Python version (e.g., 3.10 or 3.11) for data science projects. Create a new virtual environment and reinstall your packages.
+                2.  **(Quick Fix) Upgrade Libraries:** In your terminal, try upgrading the core libraries. This may resolve the conflict:
+                    ```bash
+                    pip install --upgrade scipy numpy statsmodels pandas
+                    ```
+                """)
+            else:
+                st.error(f"An error occurred while generating the dashboard: {e}")
+                st.info("This can happen if the filtered data is empty or unsuitable for a specific plot. Try adjusting the filters.")
                 
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics Engine</h2>', unsafe_allow_html=True)

@@ -3759,18 +3759,30 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             try:
                 fig = None
                 if chart_type == "Bar":
-                    if x_col:
-                        if y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
-                            # Group by x_col and sum y_col
-                            plot_df = filtered_df.groupby(x_col, as_index=False)[y_col].sum() # Default to sum
-                            fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}") # Ensure color_col is passed here
-                        else:
-                            # Count occurrences of x_col
-                            value_counts = filtered_df[x_col].value_counts().reset_index()
-                            value_counts.columns = [x_col, 'Count']
-                            fig = px.bar(value_counts, x=x_col, y='Count', title=f"Count of {x_col}")
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Bar chart without a suitable X-axis column.")
+ if x_col:
+ if y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
+ # Determine grouping columns
+ group_cols = [x_col]
+                            
+ # If color_col is valid and different from x_col, include it in grouping
+ if color_col and color_col != x_col and color_col in filtered_df.columns:
+ group_cols.append(color_col)
+ else:
+ # If color_col is not suitable for grouping, disable it for this chart
+ color_col = None # Update the outer color_col
+                            
+ plot_df = filtered_df.groupby(group_cols, as_index=False)[y_col].sum() # Default to sum
+ fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
+ else:
+ # Count occurrences of x_col
+ value_counts = filtered_df[x_col].value_counts().reset_index()
+ value_counts.columns = [x_col, 'Count']
+ # For value counts, color_col is generally not applicable unless it's x_col itself (redundant)
+ # So, explicitly set color to None for this case.
+ fig = px.bar(value_counts, x=x_col, y='Count', title=f"Count of {x_col}")
+ color_col = None # Update the outer color_col
+ else:
+ st.info(f"Chart {chart_num}: Cannot create Bar chart without a suitable X-axis column.")
 
                 elif chart_type == "Line":
                     if x_col and y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):

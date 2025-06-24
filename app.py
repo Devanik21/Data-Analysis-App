@@ -3635,9 +3635,9 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         st.subheader("📈 Dashboard Charts")
         
         # Helper function to create a single chart, now self-contained for column lists
-        def create_dashboard_chart(chart_num, filtered_df): # Renamed from create_dashboard_chart to avoid conflict
+        def create_dashboard_chart(chart_num, filtered_df):
             st.markdown(f"#### Chart {chart_num}")
-            
+
             # Ensure there's data to plot
             if filtered_df.empty:
                 st.info(f"Chart {chart_num}: Filtered data is empty.")
@@ -3651,95 +3651,129 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
 
             # Helper for automatic chart parameter selection
             def _auto_select_chart_params(chart_num, numeric_cols, categorical_cols, all_cols_df):
-                chart_type = None
-                x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
+                chart_types_available = [
+                    "Bar", "Pie", "Line", "Scatter", "Histogram", "Box", "Violin", "Area",
+                    "Density Heatmap", "Treemap", "Sunburst", "Funnel", "Polar Bar", "Polar Scatter"
+                ]
+                chart_type = chart_types_available[(chart_num - 1) % len(chart_types_available)]
 
-                # Try to create a diverse set of charts
-                # Priority: (Categorical X Numeric) -> (Numeric X Numeric) -> (Single Numeric) -> (Single Categorical)
-                # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
-                if len(categorical_cols) > 0 and len(numeric_cols) > 0:
-                    if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
-                        chart_type = "Bar"
+                x_col, y_col, names_col, values_col, color_col, path_cols, r_col, theta_col = None, None, None, None, None, None, None, None
+
+                # Select color column
+                if len(categorical_cols) > 0:
+                    color_col = get_cycled_col(categorical_cols, chart_num)
+
+                # Logic for each chart type
+                if chart_type == "Bar":
+                    if len(categorical_cols) > 0:
                         x_col = get_cycled_col(categorical_cols, chart_num - 1)
-                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
-                    elif chart_num % 4 == 2: # Pie Chart (Categorical for names, Numeric for values)
-                        chart_type = "Pie"
+                        if len(numeric_cols) > 0:
+                            y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                elif chart_type == "Pie":
+                    if len(categorical_cols) > 0 and len(numeric_cols) > 0:
                         names_col = get_cycled_col(categorical_cols, chart_num - 1)
                         values_col = get_cycled_col(numeric_cols, chart_num - 1)
-                    elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
-                        chart_type = "Line"
-                        x_col = get_cycled_col(categorical_cols, chart_num - 1) or get_cycled_col(all_cols_df, chart_num - 1)
+                elif chart_type in ["Line", "Area"]:
+                    datetime_cols = filtered_df.select_dtypes(include=['datetime64[ns]']).columns.tolist()
+                    if len(datetime_cols) > 0 and len(numeric_cols) > 0:
+                        x_col = get_cycled_col(datetime_cols, 0)
                         y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
-                    else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
-                        chart_type = "Scatter"
-                        # Try to get two different numeric columns for scatter
-                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
-                        y_col = get_cycled_col(numeric_cols, chart_num) if len(numeric_cols) > 1 else get_cycled_col(numeric_cols, chart_num - 1)
-                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
-                        if x_col is None or y_col is None: # Fallback if not enough numeric for scatter
-                            chart_type = "Bar"
-                            x_col = get_cycled_col(categorical_cols, chart_num - 1)
-                            y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                            color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
-
-                # Fallback if no mix of categorical/numeric, but enough numeric
-                elif len(numeric_cols) >= 1:
-                    if chart_num % 2 == 1 and len(numeric_cols) >= 2: # Scatter (Numeric X Numeric)
-                        chart_type = "Scatter"
+                    elif len(numeric_cols) > 1:
                         x_col = get_cycled_col(numeric_cols, chart_num - 1)
                         y_col = get_cycled_col(numeric_cols, chart_num)
-                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
-                    else: # Histogram (Single Numeric)
-                        chart_type = "Histogram"
+                elif chart_type in ["Scatter", "Density Heatmap", "Density Contour"]:
+                    if len(numeric_cols) > 1:
                         x_col = get_cycled_col(numeric_cols, chart_num - 1)
-            
-                # Fallback if only categorical
-                elif len(categorical_cols) > 0:
-                    chart_type = "Bar" # Count of categorical values
-                    x_col = get_cycled_col(categorical_cols, chart_num - 1)
-                    y_col = None # Will be count
+                        y_col = get_cycled_col(numeric_cols, chart_num)
+                elif chart_type == "Histogram":
+                    if len(numeric_cols) > 0:
+                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                elif chart_type in ["Box", "Violin"]:
+                    if len(numeric_cols) > 0:
+                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        if len(categorical_cols) > 0:
+                            x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                elif chart_type in ["Treemap", "Sunburst"]:
+                    if len(categorical_cols) > 1 and len(numeric_cols) > 0:
+                        path_cols = [get_cycled_col(categorical_cols, i) for i in range(min(2, len(categorical_cols)))]
+                        values_col = get_cycled_col(numeric_cols, chart_num - 1)
+                elif chart_type == "Funnel":
+                     if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                        y_col = get_cycled_col(categorical_cols, chart_num - 1)
+                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                elif chart_type in ["Polar Bar", "Polar Scatter"]:
+                    if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                        theta_col = get_cycled_col(categorical_cols, chart_num - 1)
+                        r_col = get_cycled_col(numeric_cols, chart_num - 1)
                 
-                return chart_type, x_col, y_col, names_col, values_col, color_col
+                if not any([x_col, y_col, names_col, path_cols, r_col, theta_col]):
+                    if len(numeric_cols) > 0:
+                        chart_type, x_col = "Histogram", get_cycled_col(numeric_cols, 0)
+                    elif len(categorical_cols) > 0:
+                        chart_type, x_col = "Bar", get_cycled_col(categorical_cols, 0)
+                    else:
+                        chart_type = None
+
+                return chart_type, x_col, y_col, names_col, values_col, color_col, path_cols, r_col, theta_col
 
             # Dynamically get numeric and categorical columns from the filtered_df
             current_numeric_cols = filtered_df.select_dtypes(include=np.number).columns.tolist()
             current_categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
             all_cols = filtered_df.columns.tolist()
 
+            # Initialize plot parameters
+            chart_type, x_col, y_col, names_col, values_col, color_col, path_cols, r_col, theta_col = [None] * 9
+
             # --- Manual Chart Configuration for specific charts ---
             if chart_num in [1, 5, 9]:
                 st.markdown(f"##### Manual Configuration for Chart {chart_num}")
+                chart_types_manual = [
+                    "Auto", "Bar", "Line", "Scatter", "Pie", "Histogram", "Box", "Violin", "Area",
+                    "Density Heatmap", "Density Contour", "Treemap", "Sunburst", "Funnel", "Polar Bar", "Polar Scatter"
+                ]
                 manual_chart_type = st.selectbox(
                     "Select Chart Type",
-                    ["Auto", "Bar", "Line", "Scatter", "Pie", "Histogram"],
+                    chart_types_manual,
                     key=f"manual_chart_type_{chart_num}"
                 )
 
                 if manual_chart_type == "Auto":
-                    chart_type, x_col, y_col, names_col, values_col, color_col = _auto_select_chart_params(
+                    chart_type, x_col, y_col, names_col, values_col, color_col, path_cols, r_col, theta_col = _auto_select_chart_params(
                         chart_num, current_numeric_cols, current_categorical_cols, all_cols
                     )
                 else:
                     chart_type = manual_chart_type
-                    # Provide options based on chart type requirements
-                    if chart_type in ["Bar", "Line", "Scatter", "Histogram"]:
-                        x_col = st.selectbox(f"X-axis Column (Chart {chart_num})", ['None'] + all_cols, key=f"manual_x_col_{chart_num}")
+                    
+                    # Generic color selector
+                    color_col = st.selectbox(f"Color by (Optional, Chart {chart_num})", ['None'] + all_cols, key=f"manual_color_col_{chart_num}")
+                    if color_col == 'None': color_col = None
+
+                    if chart_type in ["Bar", "Line", "Scatter", "Area", "Histogram", "Box", "Violin", "Density Heatmap", "Density Contour", "Funnel"]:
+                        x_col = st.selectbox(f"X-axis (Chart {chart_num})", ['None'] + all_cols, key=f"manual_x_col_{chart_num}")
                         if x_col == 'None': x_col = None
-                        if chart_type in ["Bar", "Line", "Scatter"]:
-                            y_col = st.selectbox(f"Y-axis Column (Chart {chart_num})", ['None'] + all_cols, key=f"manual_y_col_{chart_num}")
+                        if chart_type not in ["Histogram"]:
+                            y_col = st.selectbox(f"Y-axis (Chart {chart_num})", ['None'] + all_cols, key=f"manual_y_col_{chart_num}")
                             if y_col == 'None': y_col = None
-                        color_col = st.selectbox(f"Color by (Optional, Chart {chart_num})", ['None'] + all_cols, key=f"manual_color_col_{chart_num}")
-                        if color_col == 'None': color_col = None
+                    
                     elif chart_type == "Pie":
-                        names_col = st.selectbox(f"Names Column (Categorical, Chart {chart_num})", ['None'] + all_cols, key=f"manual_names_col_{chart_num}")
+                        names_col = st.selectbox(f"Names (Categorical, Chart {chart_num})", ['None'] + current_categorical_cols, key=f"manual_names_col_{chart_num}")
                         if names_col == 'None': names_col = None
-                        values_col = st.selectbox(f"Values Column (Numeric, Chart {chart_num})", ['None'] + all_cols, key=f"manual_values_col_{chart_num}")
+                        values_col = st.selectbox(f"Values (Numeric, Chart {chart_num})", ['None'] + current_numeric_cols, key=f"manual_values_col_{chart_num}")
                         if values_col == 'None': values_col = None
+
+                    elif chart_type in ["Treemap", "Sunburst"]:
+                        path_cols = st.multiselect(f"Path/Hierarchy (Categorical, Chart {chart_num})", current_categorical_cols, key=f"manual_path_cols_{chart_num}")
+                        values_col = st.selectbox(f"Values (Numeric, Chart {chart_num})", ['None'] + current_numeric_cols, key=f"manual_values_col_{chart_num}")
+                        if values_col == 'None': values_col = None
+                    
+                    elif chart_type in ["Polar Bar", "Polar Scatter"]:
+                        r_col = st.selectbox(f"R (radius, Numeric, Chart {chart_num})", ['None'] + current_numeric_cols, key=f"manual_r_col_{chart_num}")
+                        if r_col == 'None': r_col = None
+                        theta_col = st.selectbox(f"Theta (angle, Categorical, Chart {chart_num})", ['None'] + current_categorical_cols, key=f"manual_theta_col_{chart_num}")
+                        if theta_col == 'None': theta_col = None
             else:
                 # --- Existing Automatic Chart Selection Logic ---
-                chart_type, x_col, y_col, names_col, values_col, color_col = _auto_select_chart_params(
+                chart_type, x_col, y_col, names_col, values_col, color_col, path_cols, r_col, theta_col = _auto_select_chart_params(
                     chart_num, current_numeric_cols, current_categorical_cols, all_cols
                 )
 
@@ -3749,81 +3783,85 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
 
             # Add a check for color_col validity before plotting
             if color_col:
-                # Ensure the color_col exists in the filtered_df and has more than one unique non-null value
-                if color_col not in filtered_df.columns or \
-                   filtered_df[color_col].isnull().all() or \
-                   filtered_df[color_col].nunique(dropna=True) <= 1:
-                    st.info(f"Chart {chart_num}: Selected color column '{color_col}' is not suitable (e.g., all nulls or single unique value). Disabling color for this chart.")
-                    color_col = None # Set to None if not suitable
+                if color_col not in filtered_df.columns or filtered_df[color_col].nunique(dropna=True) <= 1:
+                    st.info(f"Chart {chart_num}: Color column '{color_col}' not suitable. Disabling color.")
+                    color_col = None
 
             try:
                 fig = None
+                title = f"Chart {chart_num}: {chart_type}"
+                
                 if chart_type == "Bar":
                     if x_col:
-                        if y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
-                            # Determine grouping columns
+                        if y_col and y_col in current_numeric_cols:
                             group_cols = [x_col]
-                            
-                            # If color_col is valid and different from x_col, include it in grouping
-                            if color_col and color_col != x_col and color_col in filtered_df.columns:
+                            if color_col and color_col != x_col and color_col in current_categorical_cols:
                                 group_cols.append(color_col)
                             else:
-                                # If color_col is not suitable for grouping, disable it for this chart
-                                color_col = None # Update the outer color_col
-                            
-                            plot_df = filtered_df.groupby(group_cols, as_index=False)[y_col].sum() # Default to sum
+                                color_col = None
+                            plot_df = filtered_df.groupby(group_cols, as_index=False)[y_col].sum()
                             fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
                         else:
-                            # Count occurrences of x_col
                             value_counts = filtered_df[x_col].value_counts().reset_index()
                             value_counts.columns = [x_col, 'Count']
-                            # For value counts, color_col is generally not applicable unless it's x_col itself (redundant)
-                            # So, explicitly set color to None for this case.
                             fig = px.bar(value_counts, x=x_col, y='Count', title=f"Count of {x_col}")
-                            color_col = None # Update the outer color_col
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Bar chart without a suitable X-axis column.")
-
+                
                 elif chart_type == "Line":
-                    if x_col and y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
-                        # Ensure x_col is sortable for line plots (e.g., datetime or numeric)
-                        if pd.api.types.is_datetime64_any_dtype(filtered_df[x_col]) or pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                            fig = px.line(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} over {x_col}")
-                        else:
-                            st.info(f"Chart {chart_num}: X-axis '{x_col}' is not suitable for Line plot (not datetime or numeric). Skipping.")
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Line chart without suitable X and Y columns.")
+                    if x_col and y_col and y_col in current_numeric_cols:
+                        fig = px.line(filtered_df.sort_values(by=x_col), x=x_col, y=y_col, color=color_col, title=f"{y_col} over {x_col}")
 
                 elif chart_type == "Scatter":
-                    if x_col and y_col and x_col in filtered_df.columns and y_col in filtered_df.columns and \
-                       pd.api.types.is_numeric_dtype(filtered_df[x_col]) and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
+                    if x_col and y_col and x_col in current_numeric_cols and y_col in current_numeric_cols:
                         fig = px.scatter(filtered_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Scatter chart without two suitable numeric columns.")
 
                 elif chart_type == "Pie":
-                    if names_col and values_col and names_col in filtered_df.columns and values_col in filtered_df.columns and \
-                       pd.api.types.is_numeric_dtype(filtered_df[values_col]):
+                    if names_col and values_col and values_col in current_numeric_cols:
                         fig = px.pie(filtered_df, names=names_col, values=values_col, title=f"Distribution of {values_col} by {names_col}")
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Pie chart without a suitable categorical 'names' and numeric 'values' column.")
                 
                 elif chart_type == "Histogram":
-                    if x_col and x_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                        fig = px.histogram(filtered_df, x=x_col, title=f"Histogram of {x_col}")
-                    else:
-                        st.info(f"Chart {chart_num}: Cannot create Histogram without a suitable numeric column.")
+                    if x_col and x_col in current_numeric_cols:
+                        fig = px.histogram(filtered_df, x=x_col, color=color_col, title=f"Histogram of {x_col}")
+
+                elif chart_type in ["Box", "Violin"]:
+                    if y_col and y_col in current_numeric_cols:
+                        plot_func = px.box if chart_type == "Box" else px.violin
+                        fig = plot_func(filtered_df, y=y_col, x=x_col, color=color_col, title=f"{chart_type} Plot of {y_col}")
+
+                elif chart_type == "Area":
+                    if x_col and y_col and y_col in current_numeric_cols:
+                        fig = px.area(filtered_df.sort_values(by=x_col), x=x_col, y=y_col, color=color_col, title=f"Area Plot of {y_col} over {x_col}")
+
+                elif chart_type in ["Density Heatmap", "Density Contour"]:
+                    if x_col and y_col and x_col in current_numeric_cols and y_col in current_numeric_cols:
+                        plot_func = px.density_heatmap if chart_type == "Density Heatmap" else px.density_contour
+                        fig = plot_func(filtered_df, x=x_col, y=y_col, title=f"{chart_type} of {y_col} vs {x_col}")
+
+                elif chart_type in ["Treemap", "Sunburst"]:
+                    if path_cols and values_col and values_col in current_numeric_cols:
+                        plot_func = px.treemap if chart_type == "Treemap" else px.sunburst
+                        fig = plot_func(filtered_df, path=path_cols, values=values_col, color=color_col, title=f"{chart_type} of {values_col}")
+
+                elif chart_type == "Funnel":
+                    if x_col and y_col and x_col in current_numeric_cols and y_col in current_categorical_cols:
+                        plot_df = filtered_df.groupby(y_col, as_index=False)[x_col].sum()
+                        fig = px.funnel(plot_df, x=x_col, y=y_col, title=f"Funnel Chart of {x_col} by {y_col}")
+
+                elif chart_type in ["Polar Bar", "Polar Scatter"]:
+                    if r_col and theta_col and r_col in current_numeric_cols and theta_col in current_categorical_cols:
+                        plot_func = px.bar_polar if chart_type == "Polar Bar" else px.scatter_polar
+                        if chart_type == "Polar Bar":
+                            plot_df = filtered_df.groupby(theta_col, as_index=False)[r_col].mean()
+                            fig = plot_func(plot_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Bar Chart")
+                        else: # Polar Scatter
+                            fig = plot_func(filtered_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Scatter Chart")
 
                 if fig:
-                    # Update key to include manual selection state
-                    st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}_{manual_chart_type if chart_num in [1,5,9] else 'auto'}")
+                    st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}")
                 else:
-                    st.info(f"Chart {chart_num}: Could not generate a plot with available data and selected type.")
+                    st.info(f"Chart {chart_num}: Could not generate a '{chart_type}' plot with the selected columns or available data.")
 
             except Exception as e:
-                st.error(f"Error generating Chart {chart_num}: {e}")
-                st.write(f"Numeric Columns: {current_numeric_cols}")
-                st.write(f"Categorical Columns: {current_categorical_cols}")
+                st.error(f"Error generating Chart {chart_num} ({chart_type}) with columns (x:{x_col}, y:{y_col}, names:{names_col}, values:{values_col}, path:{path_cols}, r:{r_col}, theta:{theta_col}): {e}")
 
         # Loop to create 10 charts
         for i in range(1, 11): # For charts 1 to 10

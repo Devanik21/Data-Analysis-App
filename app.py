@@ -3863,8 +3863,18 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             except Exception as e:
                 st.error(f"Error generating Chart {chart_num} ({chart_type}) with columns (x:{x_col}, y:{y_col}, names:{names_col}, values:{values_col}, path:{path_cols}, r:{r_col}, theta:{theta_col}): {e}")
 
-        # Loop to create 10 charts
-        for i in range(1, 11): # For charts 1 to 10
+        # Allow user to select the number of charts to display
+        num_charts_to_display = st.slider(
+            "Number of Charts to Display",
+            min_value=1,
+            max_value=20, # Set a reasonable maximum number of charts
+            value=10, # Default to 10 charts
+            step=1,
+            help="Adjust the number of charts shown on the dashboard. More charts may impact performance."
+        )
+
+        # Loop to create charts based on user selection
+        for i in range(1, num_charts_to_display + 1):
             if i % 2 != 0: # Start a new row for odd numbered charts
                 chart_layout_cols = st.columns(2)
             

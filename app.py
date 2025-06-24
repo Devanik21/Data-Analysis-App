@@ -3797,14 +3797,16 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                             group_cols = [x_col]
                             if color_col and color_col != x_col and color_col in current_categorical_cols:
                                 group_cols.append(color_col)
-                            else:
-                                color_col = None
                             plot_df = filtered_df.groupby(group_cols, as_index=False)[y_col].sum()
+                            # Validate color_col against plot_df
+                            effective_color_col = color_col if color_col in plot_df.columns and color_col != x_col else None
                             fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
                         else:
                             value_counts = filtered_df[x_col].value_counts().reset_index()
                             value_counts.columns = [x_col, 'Count']
-                            fig = px.bar(value_counts, x=x_col, y='Count', title=f"Count of {x_col}")
+                            # For value_counts, color can only be x_col itself
+                            effective_color_col = x_col if color_col == x_col else None
+                            fig = px.bar(value_counts, x=x_col, y='Count', color=effective_color_col, title=f"Count of {x_col}")
                 
                 elif chart_type == "Line":
                     if x_col and y_col and y_col in current_numeric_cols:
@@ -3851,6 +3853,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                         plot_func = px.bar_polar if chart_type == "Polar Bar" else px.scatter_polar
                         if chart_type == "Polar Bar":
                             plot_df = filtered_df.groupby(theta_col, as_index=False)[r_col].mean()
+                            # Validate color_col against plot_df
+                            effective_color_col = color_col if color_col in plot_df.columns and color_col != theta_col else None
                             fig = plot_func(plot_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Bar Chart")
                         else: # Polar Scatter
                             fig = plot_func(filtered_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Scatter Chart")

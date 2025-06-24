@@ -3656,57 +3656,56 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
 
                 # Try to create a diverse set of charts
                 # Priority: (Categorical X Numeric) -> (Numeric X Numeric) -> (Single Numeric) -> (Single Categorical)
+                # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
+                if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+                    if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
+                        chart_type = "Bar"
+                        x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                    elif chart_num % 4 == 2: # Pie Chart (Categorical for names, Numeric for values)
+                        chart_type = "Pie"
+                        names_col = get_cycled_col(categorical_cols, chart_num - 1)
+                        values_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
+                        chart_type = "Line"
+                        x_col = get_cycled_col(categorical_cols, chart_num - 1) or get_cycled_col(all_cols_df, chart_num - 1)
+                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                    else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
+                        chart_type = "Scatter"
+                        # Try to get two different numeric columns for scatter
+                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        y_col = get_cycled_col(numeric_cols, chart_num) if len(numeric_cols) > 1 else get_cycled_col(numeric_cols, chart_num - 1)
+                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                        if x_col is None or y_col is None: # Fallback if not enough numeric for scatter
+                            chart_type = "Bar"
+                            x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                            y_col = get_cycled_col(numeric_cols, chart_num - 1)
+                            color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+
+                # Fallback if no mix of categorical/numeric, but enough numeric
+                elif len(numeric_cols) >= 1:
+                    if chart_num % 2 == 1 and len(numeric_cols) >= 2: # Scatter (Numeric X Numeric)
+                        chart_type = "Scatter"
+                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                        y_col = get_cycled_col(numeric_cols, chart_num)
+                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                    else: # Histogram (Single Numeric)
+                        chart_type = "Histogram"
+                        x_col = get_cycled_col(numeric_cols, chart_num - 1)
+            
+                # Fallback if only categorical
+                elif len(categorical_cols) > 0:
+                    chart_type = "Bar" # Count of categorical values
+                    x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                    y_col = None # Will be count
+                
+                return chart_type, x_col, y_col, names_col, values_col, color_col
 
             # Dynamically get numeric and categorical columns from the filtered_df
             current_numeric_cols = filtered_df.select_dtypes(include=np.number).columns.tolist()
             current_categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
-                # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
-                if len(categorical_cols) > 0 and len(numeric_cols) > 0:
-                if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
-                    chart_type = "Bar"
-                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
-                    y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
-                elif chart_num % 4 == 2: # Pie Chart (Categorical for names, Numeric for values)
-                    chart_type = "Pie"
-                    names_col = get_cycled_col(current_categorical_cols, chart_num - 1)
-                    values_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
-                    chart_type = "Line"
-                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1) or get_cycled_col(all_cols_df, chart_num - 1)
-                    y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
-                else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
-                    chart_type = "Scatter"
-                    # Try to get two different numeric columns for scatter
-                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                    y_col = get_cycled_col(current_numeric_cols, chart_num) if len(current_numeric_cols) > 1 else get_cycled_col(current_numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 0 else None
-                    if x_col is None or y_col is None: # Fallback if not enough numeric for scatter
-                        chart_type = "Bar"
-                        x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
-                        y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                        color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
-
-                # Fallback if no mix of categorical/numeric, but enough numeric
-                elif len(numeric_cols) >= 1:
-                if chart_num % 2 == 1 and len(current_numeric_cols) >= 2: # Scatter (Numeric X Numeric)
-                    chart_type = "Scatter"
-                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-                    y_col = get_cycled_col(current_numeric_cols, chart_num)
-                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 0 else None
-                else: # Histogram (Single Numeric)
-                    chart_type = "Histogram"
-                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
-            
-                # Fallback if only categorical
-                elif len(categorical_cols) > 0:
-                chart_type = "Bar" # Count of categorical values
-                x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
-                y_col = None # Will be count
-                
-                return chart_type, x_col, y_col, names_col, values_col, color_col
-
             all_cols = filtered_df.columns.tolist()
 
             # --- Manual Chart Configuration for specific charts ---

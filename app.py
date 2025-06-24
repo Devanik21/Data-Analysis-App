@@ -181,8 +181,8 @@ tools = [
     "📊 Exploratory Data Analysis (EDA)",
     "📈 Excel Query Tool",
     "💼 Power BI Style Dashboard",
-    "🐍 Python Advanced Analytics",
     "🐼 Pandas Query Tool",
+    "🐍 Python Advanced Analytics",
     "🌐 Web Scraping Tool",
     "🤖 AI-Powered Insights (Gemini)"
 ]

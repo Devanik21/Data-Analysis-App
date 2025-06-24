@@ -3635,7 +3635,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         st.subheader("📈 Dashboard Charts")
         
         # Helper function to create a single chart, now self-contained for column lists
-        def create_dashboard_chart(chart_num, filtered_df):
+        def create_dashboard_chart(chart_num, filtered_df): # Renamed from create_dashboard_chart to avoid conflict
             st.markdown(f"#### Chart {chart_num}")
             
             # Ensure there's data to plot
@@ -3643,25 +3643,25 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                 st.info(f"Chart {chart_num}: Filtered data is empty.")
                 return
 
-            # Dynamically get numeric and categorical columns from the filtered_df
-            current_numeric_cols = filtered_df.select_dtypes(include=np.number).columns.tolist()
-            current_categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
-
-            chart_type = None
-            x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
-            
             # Helper to safely get a column from a list, cycling through
-            # This helper is fine, the check for suitability needs to happen after selection
             def get_cycled_col(col_list, index_offset):
                 if col_list:
                     return col_list[index_offset % len(col_list)]
                 return None
 
-            # Try to create a diverse set of charts
-            # Priority: (current_Categorical X current_Numeric) -> (current_Numeric X current_Numeric) -> (Single current_Numeric) -> (Single current_Categorical)
+            # Helper for automatic chart parameter selection
+            def _auto_select_chart_params(chart_num, numeric_cols, categorical_cols, all_cols_df):
+                chart_type = None
+                x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
 
-            # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
-            if len(current_categorical_cols) > 0 and len(current_numeric_cols) > 0:
+                # Try to create a diverse set of charts
+                # Priority: (Categorical X Numeric) -> (Numeric X Numeric) -> (Single Numeric) -> (Single Categorical)
+
+            # Dynamically get numeric and categorical columns from the filtered_df
+            current_numeric_cols = filtered_df.select_dtypes(include=np.number).columns.tolist()
+            current_categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
+                # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
+                if len(categorical_cols) > 0 and len(numeric_cols) > 0:
                 if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
                     chart_type = "Bar"
                     x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
@@ -3673,7 +3673,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     values_col = get_cycled_col(current_numeric_cols, chart_num - 1)
                 elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
                     chart_type = "Line"
-                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1) or get_cycled_col(filtered_df.columns.tolist(), chart_num - 1)
+                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1) or get_cycled_col(all_cols_df, chart_num - 1)
                     y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
                     color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
                 else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
@@ -3688,8 +3688,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                         y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
                         color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
 
-            # Fallback if no mix of categorical/numeric, but enough numeric
-            elif len(current_numeric_cols) >= 1:
+                # Fallback if no mix of categorical/numeric, but enough numeric
+                elif len(numeric_cols) >= 1:
                 if chart_num % 2 == 1 and len(current_numeric_cols) >= 2: # Scatter (Numeric X Numeric)
                     chart_type = "Scatter"
                     x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
@@ -3699,11 +3699,50 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     chart_type = "Histogram"
                     x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
             
-            # Fallback if only categorical
-            elif len(current_categorical_cols) > 0:
+                # Fallback if only categorical
+                elif len(categorical_cols) > 0:
                 chart_type = "Bar" # Count of categorical values
                 x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
                 y_col = None # Will be count
+                
+                return chart_type, x_col, y_col, names_col, values_col, color_col
+
+            all_cols = filtered_df.columns.tolist()
+
+            # --- Manual Chart Configuration for specific charts ---
+            if chart_num in [1, 5, 9]:
+                st.markdown(f"##### Manual Configuration for Chart {chart_num}")
+                manual_chart_type = st.selectbox(
+                    "Select Chart Type",
+                    ["Auto", "Bar", "Line", "Scatter", "Pie", "Histogram"],
+                    key=f"manual_chart_type_{chart_num}"
+                )
+
+                if manual_chart_type == "Auto":
+                    chart_type, x_col, y_col, names_col, values_col, color_col = _auto_select_chart_params(
+                        chart_num, current_numeric_cols, current_categorical_cols, all_cols
+                    )
+                else:
+                    chart_type = manual_chart_type
+                    # Provide options based on chart type requirements
+                    if chart_type in ["Bar", "Line", "Scatter", "Histogram"]:
+                        x_col = st.selectbox(f"X-axis Column (Chart {chart_num})", ['None'] + all_cols, key=f"manual_x_col_{chart_num}")
+                        if x_col == 'None': x_col = None
+                        if chart_type in ["Bar", "Line", "Scatter"]:
+                            y_col = st.selectbox(f"Y-axis Column (Chart {chart_num})", ['None'] + all_cols, key=f"manual_y_col_{chart_num}")
+                            if y_col == 'None': y_col = None
+                        color_col = st.selectbox(f"Color by (Optional, Chart {chart_num})", ['None'] + all_cols, key=f"manual_color_col_{chart_num}")
+                        if color_col == 'None': color_col = None
+                    elif chart_type == "Pie":
+                        names_col = st.selectbox(f"Names Column (Categorical, Chart {chart_num})", ['None'] + all_cols, key=f"manual_names_col_{chart_num}")
+                        if names_col == 'None': names_col = None
+                        values_col = st.selectbox(f"Values Column (Numeric, Chart {chart_num})", ['None'] + all_cols, key=f"manual_values_col_{chart_num}")
+                        if values_col == 'None': values_col = None
+            else:
+                # --- Existing Automatic Chart Selection Logic ---
+                chart_type, x_col, y_col, names_col, values_col, color_col = _auto_select_chart_params(
+                    chart_num, current_numeric_cols, current_categorical_cols, all_cols
+                )
 
             if chart_type is None:
                 st.info(f"Chart {chart_num}: Not enough suitable columns to generate a plot.")
@@ -3765,7 +3804,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                         st.info(f"Chart {chart_num}: Cannot create Histogram without a suitable numeric column.")
 
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}")
+                    # Update key to include manual selection state
+                    st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}_{manual_chart_type if chart_num in [1,5,9] else 'auto'}")
                 else:
                     st.info(f"Chart {chart_num}: Could not generate a plot with available data and selected type.")
 

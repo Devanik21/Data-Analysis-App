@@ -3634,14 +3634,18 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         st.markdown("---")
         st.subheader("📈 Dashboard Charts")
         
-        # Helper function to create a single chart
-        def create_dashboard_chart(chart_num, filtered_df, numeric_cols, categorical_cols):
+        # Helper function to create a single chart, now self-contained for column lists
+        def create_dashboard_chart(chart_num, filtered_df):
             st.markdown(f"#### Chart {chart_num}")
             
             # Ensure there's data to plot
             if filtered_df.empty:
                 st.info(f"Chart {chart_num}: Filtered data is empty.")
                 return
+
+            # Dynamically get numeric and categorical columns from the filtered_df
+            current_numeric_cols = filtered_df.select_dtypes(include=np.number).columns.tolist()
+            current_categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
 
             chart_type = None
             x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
@@ -3653,51 +3657,51 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                 return None
 
             # Try to create a diverse set of charts
-            # Priority: (Categorical X Numeric) -> (Numeric X Numeric) -> (Single Numeric) -> (Single Categorical)
+            # Priority: (current_Categorical X current_Numeric) -> (current_Numeric X current_Numeric) -> (Single current_Numeric) -> (Single current_Categorical)
 
             # Attempt 1: Bar/Pie/Line/Scatter with Categorical and Numeric
-            if len(categorical_cols) > 0 and len(numeric_cols) > 0:
+            if len(current_categorical_cols) > 0 and len(current_numeric_cols) > 0:
                 if chart_num % 4 == 1: # Bar Chart (Categorical X Numeric)
                     chart_type = "Bar"
-                    x_col = get_cycled_col(categorical_cols, chart_num - 1)
-                    y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
+                    y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
                 elif chart_num % 4 == 2: # Pie Chart (Categorical for names, Numeric for values)
                     chart_type = "Pie"
-                    names_col = get_cycled_col(categorical_cols, chart_num - 1)
-                    values_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    names_col = get_cycled_col(current_categorical_cols, chart_num - 1)
+                    values_col = get_cycled_col(current_numeric_cols, chart_num - 1)
                 elif chart_num % 4 == 3: # Line Chart (Categorical X Numeric, or first col if not suitable)
                     chart_type = "Line"
-                    x_col = get_cycled_col(categorical_cols, chart_num - 1) or get_cycled_col(filtered_df.columns.tolist(), chart_num - 1)
-                    y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                    x_col = get_cycled_col(current_categorical_cols, chart_num - 1) or get_cycled_col(filtered_df.columns.tolist(), chart_num - 1)
+                    y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
                 else: # chart_num % 4 == 0 (Scatter, if x can be numeric, else Bar)
                     chart_type = "Scatter"
                     # Try to get two different numeric columns for scatter
-                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
-                    y_col = get_cycled_col(numeric_cols, chart_num) if len(numeric_cols) > 1 else get_cycled_col(numeric_cols, chart_num - 1)
-                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
+                    y_col = get_cycled_col(current_numeric_cols, chart_num) if len(current_numeric_cols) > 1 else get_cycled_col(current_numeric_cols, chart_num - 1)
+                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 0 else None
                     if x_col is None or y_col is None: # Fallback if not enough numeric for scatter
                         chart_type = "Bar"
-                        x_col = get_cycled_col(categorical_cols, chart_num - 1)
-                        y_col = get_cycled_col(numeric_cols, chart_num - 1)
-                        color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 1 else None
+                        x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
+                        y_col = get_cycled_col(current_numeric_cols, chart_num - 1)
+                        color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 1 else None
 
             # Fallback if no mix of categorical/numeric, but enough numeric
-            elif len(numeric_cols) >= 1:
-                if chart_num % 2 == 1 and len(numeric_cols) >= 2: # Scatter (Numeric X Numeric)
+            elif len(current_numeric_cols) >= 1:
+                if chart_num % 2 == 1 and len(current_numeric_cols) >= 2: # Scatter (Numeric X Numeric)
                     chart_type = "Scatter"
-                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
-                    y_col = get_cycled_col(numeric_cols, chart_num)
-                    color_col = get_cycled_col(categorical_cols, chart_num) if len(categorical_cols) > 0 else None
+                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
+                    y_col = get_cycled_col(current_numeric_cols, chart_num)
+                    color_col = get_cycled_col(current_categorical_cols, chart_num) if len(current_categorical_cols) > 0 else None
                 else: # Histogram (Single Numeric)
                     chart_type = "Histogram"
-                    x_col = get_cycled_col(numeric_cols, chart_num - 1)
+                    x_col = get_cycled_col(current_numeric_cols, chart_num - 1)
             
             # Fallback if only categorical
-            elif len(categorical_cols) > 0:
+            elif len(current_categorical_cols) > 0:
                 chart_type = "Bar" # Count of categorical values
-                x_col = get_cycled_col(categorical_cols, chart_num - 1)
+                x_col = get_cycled_col(current_categorical_cols, chart_num - 1)
                 y_col = None # Will be count
 
             if chart_type is None:
@@ -3757,8 +3761,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
 
             except Exception as e:
                 st.error(f"Error generating Chart {chart_num}: {e}")
-                st.write(f"Numeric Columns: {numeric_cols}")
-                st.write(f"Categorical Columns: {categorical_cols}")
+                st.write(f"Numeric Columns: {current_numeric_cols}")
+                st.write(f"Categorical Columns: {current_categorical_cols}")
                 if len(numeric_cols) > 0 and len(filtered_df.columns) > 1:
                     x_col = filtered_df.columns[0]
                     st.write(f"Type of X Column: {filtered_df[x_col].dtype}")
@@ -3772,8 +3776,8 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             if i % 2 != 0: # Start a new row for odd numbered charts
                 chart_layout_cols = st.columns(2)
             
-            with chart_layout_cols[(i-1) % 2]: # Place in first or second column
-                create_dashboard_chart(i, filtered_df, numeric_cols, categorical_cols)
+            with chart_layout_cols[(i - 1) % 2]: # Place in first or second column
+                create_dashboard_chart(i, filtered_df)
 
 elif selected_tool == "🐍 Python Advanced Analytics": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)

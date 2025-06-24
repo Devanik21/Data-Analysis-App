@@ -3651,6 +3651,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             x_col, y_col, names_col, values_col, color_col = None, None, None, None, None
             
             # Helper to safely get a column from a list, cycling through
+            # This helper is fine, the check for suitability needs to happen after selection
             def get_cycled_col(col_list, index_offset):
                 if col_list:
                     return col_list[index_offset % len(col_list)]
@@ -3708,6 +3709,15 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                 st.info(f"Chart {chart_num}: Not enough suitable columns to generate a plot.")
                 return
 
+            # Add a check for color_col validity before plotting
+            if color_col:
+                # Ensure the color_col exists in the filtered_df and has more than one unique non-null value
+                if color_col not in filtered_df.columns or \
+                   filtered_df[color_col].isnull().all() or \
+                   filtered_df[color_col].nunique(dropna=True) <= 1:
+                    st.info(f"Chart {chart_num}: Selected color column '{color_col}' is not suitable (e.g., all nulls or single unique value). Disabling color for this chart.")
+                    color_col = None # Set to None if not suitable
+
             try:
                 fig = None
                 if chart_type == "Bar":
@@ -3715,7 +3725,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                         if y_col and y_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[y_col]):
                             # Group by x_col and sum y_col
                             plot_df = filtered_df.groupby(x_col, as_index=False)[y_col].sum() # Default to sum
-                            fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
+                            fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}") # Ensure color_col is passed here
                         else:
                             # Count occurrences of x_col
                             value_counts = filtered_df[x_col].value_counts().reset_index()
@@ -3763,13 +3773,6 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                 st.error(f"Error generating Chart {chart_num}: {e}")
                 st.write(f"Numeric Columns: {current_numeric_cols}")
                 st.write(f"Categorical Columns: {current_categorical_cols}")
-                if len(numeric_cols) > 0 and len(filtered_df.columns) > 1:
-                    x_col = filtered_df.columns[0]
-                    st.write(f"Type of X Column: {filtered_df[x_col].dtype}")
-                    if chart_type == "Scatter" and not pd.api.types.is_numeric_dtype(filtered_df[x_col]):
-                        st.write("Scatter plot requires a numeric x-axis. Using Bar instead.")
-                        # The fig might not be defined here if the error happened before fig assignment
-                        # This line is problematic if fig is not defined. Removing it as the main logic handles fallback.
 
         # Loop to create 10 charts
         for i in range(1, 11): # For charts 1 to 10

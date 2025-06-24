@@ -3800,7 +3800,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                             plot_df = filtered_df.groupby(group_cols, as_index=False)[y_col].sum()
                             # Validate color_col against plot_df
                             effective_color_col = color_col if color_col in plot_df.columns and color_col != x_col else None
-                            fig = px.bar(plot_df, x=x_col, y=y_col, color=color_col, title=f"{y_col} by {x_col}")
+                            fig = px.bar(plot_df, x=x_col, y=y_col, color=effective_color_col, title=f"{y_col} by {x_col}")
                         else:
                             value_counts = filtered_df[x_col].value_counts().reset_index()
                             value_counts.columns = [x_col, 'Count']
@@ -3855,7 +3855,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                             plot_df = filtered_df.groupby(theta_col, as_index=False)[r_col].mean()
                             # Validate color_col against plot_df
                             effective_color_col = color_col if color_col in plot_df.columns and color_col != theta_col else None
-                            fig = plot_func(plot_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Bar Chart")
+                            fig = plot_func(plot_df, r=r_col, theta=theta_col, color=effective_color_col, title=f"Polar Bar Chart")
                         else: # Polar Scatter
                             fig = plot_func(filtered_df, r=r_col, theta=theta_col, color=color_col, title=f"Polar Scatter Chart")
 

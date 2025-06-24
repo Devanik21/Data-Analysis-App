@@ -3885,7 +3885,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
             with chart_layout_cols[(i - 1) % 2]: # Place in first or second column
                 create_dashboard_chart(i, filtered_df)
 
-elif selected_tool == "🐍 Python Advanced Analytics": # This was already there, but keeping it for context
+elif selected_tool == "🐼 Pandas Query Tool": # This was already there, but keeping it for context
     st.markdown('<h2 class="tool-header">🐼 Advanced Pandas Query Tool</h2>', unsafe_allow_html=True)
 
     # --- Pandas Query Examples ---

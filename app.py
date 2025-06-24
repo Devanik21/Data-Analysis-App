@@ -3748,7 +3748,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
                     if x_col and x_col in filtered_df.columns and pd.api.types.is_numeric_dtype(filtered_df[x_col]):
                         fig = px.histogram(filtered_df, x=x_col, title=f"Histogram of {x_col}")
                     else:
-info(f"Chart {chart_num}: Cannot create Histogram without a suitable numeric column.")
+                        st.info(f"Chart {chart_num}: Cannot create Histogram without a suitable numeric column.")
 
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, key=f"chart_plot_{chart_num}_{chart_type}_{x_col}_{y_col}_{names_col}_{values_col}_{color_col}")

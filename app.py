@@ -4846,8 +4846,10 @@ elif selected_tool == "🐍 Python Advanced Analytics":
                     'code': python_code,
                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
-                st.session_state.python_output = "Executing code..." # Provide immediate feedback
-                st.success("Code executed!")
+                with st.spinner("Executing Python code..."): # Show spinner while code runs
+                    # execute_python_code already sets st.session_state.python_output
+                    execute_python_code(python_code, df)
+                st.success("Code execution complete!")
         with col2:
             st.info("Output and plots will appear below.")
 

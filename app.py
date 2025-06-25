@@ -186,7 +186,7 @@ tools = [
     "🐼 Pandas Query Tool",
     "🐍 Python Advanced Analytics",
     "🌐 Web Scraping Tool",
-    "🤖 AI-Powered Insights (Gemini)"
+    "🦄 AI-Powered Insights (Gemini)"
 ]
 
 selected_tool = st.sidebar.selectbox("Select Analysis Tool", tools)
@@ -344,7 +344,7 @@ def generate_gemini_content(prompt_text: str) -> Optional[str]:
         st.error("Gemini model not configured. Please enter your API key in the sidebar.")
         return None
     try:
-        with st.spinner("🤖 Gemini is thinking..."):
+        with st.spinner("🦄 Gemini is thinking..."):
             response = st.session_state.gemini_model.generate_content(prompt_text)
             return response.text
     except Exception as e:
@@ -804,7 +804,7 @@ elif selected_tool == "🔍 SQL Query Engine":
             st.session_state.sql_params = edited_params
 
             # AI Query Generator
-            st.subheader("🤖 AI Query Assistant")
+            st.subheader("🦄 AI Query Assistant")
             if not st.session_state.gemini_model:
                 st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
             else:
@@ -967,7 +967,7 @@ Format your response using markdown.
 """
                         optimization_suggestion = generate_gemini_content(prompt)
                         if optimization_suggestion:
-                            st.subheader("🤖 AI Optimization Suggestion")
+                            st.subheader("🦄 AI Optimization Suggestion")
                             st.markdown(optimization_suggestion)
             # The 'Format Query' button functionality has been removed as per the request
             # to remove dependency on 'sql_formatter.api'.
@@ -982,7 +982,7 @@ Format your response using markdown.
                 
                 # --- AI Interpretation Button ---
                 if not result_df.empty:
-                    if st.button("🤖 Interpret Results with AI"):
+                    if st.button("🦄 Interpret Results with AI"):
                         if not st.session_state.gemini_model:
                             st.warning("Enter your Google AI API Key to use this feature.")
                         else:
@@ -1002,7 +1002,7 @@ Focus on the business or analytical implications of the findings.
 """
                             interpretation = generate_gemini_content(prompt)
                             if interpretation:
-                                st.subheader("🤖 AI Result Interpretation")
+                                st.subheader("🦄 AI Result Interpretation")
                                 st.markdown(interpretation)
 
                 # Export options
@@ -1191,7 +1191,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         else:
                             st.warning("The data does not appear to be normally distributed.")
                         
-                        if st.button("🤖 Get AI Interpretation", key="dist_ai_interp"):
+                        if st.button("🦄 Get AI Interpretation", key="dist_ai_interp"):
                             if not st.session_state.gemini_model:
                                 st.warning("Please configure your Google AI API Key in the sidebar.")
                             else:
@@ -1218,7 +1218,7 @@ Use markdown for formatting.
                                 interpretation = generate_gemini_content(prompt)
                                 if interpretation:
                                     st.markdown("---")
-                                    st.markdown("#### 🤖 AI-Powered Interpretation")
+                                    st.markdown("#### 🦄 AI-Powered Interpretation")
                                     st.markdown(interpretation)
 
                 st.markdown("---")
@@ -4574,8 +4574,8 @@ for title in titles:
             scrape_website(url, method, scrape_params, export_format)
 
 # --- AI-Powered Insights (Gemini) ---
-if selected_tool == "🤖 AI-Powered Insights (Gemini)":
-    st.markdown('<h2 class="tool-header">🤖 AI-Powered Insights (Gemini)</h2>', unsafe_allow_html=True)
+if selected_tool == "🦄 AI-Powered Insights (Gemini)":
+    st.markdown('<h2 class="tool-header">🦄 AI-Powered Insights (Gemini)</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
         st.warning("Please upload data first to use AI insights!")
@@ -4714,7 +4714,7 @@ Your code MUST:
                                 st.error(f"Attempt {attempt + 1} failed: {e}")
                                 # This block was incorrectly indented. It should be at the same level as the st.error above.
                                 if attempt < max_retries:
-                                    st.info("🤖 The code failed. Asking Gemini for a fix...")
+                                    st.info("🦄 The code failed. Asking Gemini for a fix...")
                                     with st.spinner("Attempting to self-correct the code..."):
                                         fix_prompt = f"""You are a Python debugging expert. The following code, intended to generate a Plotly chart, failed with an error.
 Original user request: "{chart_request}"
@@ -4905,7 +4905,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
             st.info("No saved snippets yet.")
 
         # AI Assistant for Python Code
-        st.subheader("🤖 AI Assistant for Python Code")
+        st.subheader("🦄 AI Assistant for Python Code")
         if not st.session_state.gemini_model:
             st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
         else: # Line 5003
@@ -4975,7 +4975,7 @@ Your code MUST:
                         prompt = f"You are an expert Python developer and teacher. Explain the following Python code step-by-step. Describe what the code does, its purpose, and how it works.\nUse markdown for formatting.\n\nCode:\n```python\n{code_to_explain}\n```"
                         explanation = generate_gemini_content(prompt)
                         if explanation:
-                            st.subheader("🤖 AI Code Explanation")
+                            st.subheader("🦄 AI Code Explanation")
                             st.markdown(explanation)
                     else:
                         st.warning("Please paste some code to explain.")
@@ -5117,7 +5117,7 @@ Provide Python code to visualize their relationship (e.g., scatter plot, pair pl
                                 st.markdown(relationship_explanation)
 
             elif ai_python_task == "Recommend ML Model":
-                st.subheader("🤖 Recommend ML Model")
+                st.subheader("🦄 Recommend ML Model")
                 if df.empty:
                     st.warning("DataFrame is empty. Please upload data.")
                 else:

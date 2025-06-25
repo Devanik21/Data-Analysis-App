@@ -4906,8 +4906,8 @@ elif selected_tool == "🐍 Python Advanced Analytics":
         st.subheader("🤖 AI Assistant for Python Code")
         if not st.session_state.gemini_model:
             st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
-        else:
-            ai_python_task = st.selectbox("Select AI Task", ["Generate Code from Natural Language", "Explain Code"], key="ai_python_task")
+        else: # Line 5003
+            ai_python_task = st.selectbox("Select AI Task", ["Explain Code"], key="ai_python_task")
 
             if ai_python_task == "Generate Code from Natural Language":
                 nl_request = st.text_area(

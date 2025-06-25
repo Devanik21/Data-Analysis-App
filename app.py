@@ -4707,7 +4707,7 @@ Your code MUST:
                                     # This is a logical error, not a syntax/runtime one. We'll trigger a retry.
                                     raise ValueError("The generated code did not create a 'fig' variable of type go.Figure.")
 
-                            except Exception as e:
+                            except (Exception, ValueError) as e:
                                 st.error(f"Attempt {attempt + 1} failed: {e}")
         
         elif quick_ops == "Replace Values":

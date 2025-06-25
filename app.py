@@ -4813,6 +4813,121 @@ If no features of a certain type are applicable, don't include that section.
                 else:
                     st.warning("Please paste some code to explain.")
 
+elif selected_tool == "🐍 Python Advanced Analytics":
+    st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics</h2>', unsafe_allow_html=True)
+
+    if st.session_state.df is None:
+        st.warning("Please upload data first!")
+    else:
+        df = st.session_state.df
+
+        # Code Editor and Execution
+        st.subheader("✍️ Python Code Editor")
+        st.info("You can write and execute Python code. The DataFrame is available as `df`. "
+                "Use `print()` for text output. For plots, assign a `matplotlib.pyplot` figure to `plt.figure()` "
+                "or a `plotly.graph_objects.Figure` to `fig` (or a list of figures to `figs`).")
+
+        python_code = st.text_area(
+            "Enter your Python code here:",
+            value=st.session_state.get('current_python_code', "print(df.head())\n\n# Example Plotly chart:\n# import plotly.express as px\n# fig = px.histogram(df, x=df.columns[0])\n\n# Example Matplotlib plot:\n# import matplotlib.pyplot as plt\n# plt.figure(figsize=(8,6))\n# plt.hist(df.iloc[:,0].dropna())\n# plt.title('Histogram')"),
+            height=300,
+            key="python_code_editor"
+        )
+        st.session_state.current_python_code = python_code # Save current code to session state
+
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            if st.button("🚀 Execute Code", type="primary", use_container_width=True):
+                execute_python_code(python_code, df)
+                st.session_state.python_history.append({
+                    'code': python_code,
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+                st.success("Code executed!")
+        with col2:
+            st.info("Output and plots will appear below.")
+
+        # Display Output
+        if 'python_output' in st.session_state and st.session_state.python_output:
+            st.subheader("🖥️ Code Output")
+            st.code(st.session_state.python_output, language='python')
+
+        if st.session_state.python_plots:
+            st.subheader("📈 Matplotlib/Seaborn Plots")
+            for i, fig in enumerate(st.session_state.python_plots):
+                st.pyplot(fig, key=f"mpl_plot_{i}")
+                # plt.close(fig) # Handled by plt.close('all') in execute_python_code
+
+        if st.session_state.python_plotly_figs:
+            st.subheader("📊 Plotly Figures")
+            for i, fig in enumerate(st.session_state.python_plotly_figs):
+                st.plotly_chart(fig, use_container_width=True, key=f"plotly_fig_{i}")
+
+        # AI Assistant for Python Code
+        st.subheader("🤖 AI Assistant for Python Code")
+        if not st.session_state.gemini_model:
+            st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
+        else:
+            ai_python_task = st.selectbox("Select AI Task", ["Generate Code from Natural Language", "Explain Code"], key="ai_python_task")
+
+            if ai_python_task == "Generate Code from Natural Language":
+                nl_request = st.text_area(
+                    "Describe the Python code you want to generate:",
+                    placeholder="e.g., 'Calculate the mean of column A and print it'",
+                    height=100,
+                    key="ai_python_nl_request"
+                )
+                if st.button("✨ Generate Python Code"):
+                    if nl_request:
+                        schema_str = pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()
+                        prompt = f"""You are an expert Python developer using pandas, numpy, matplotlib.pyplot (as plt), and plotly.express (as px).
+Given a pandas DataFrame named `df` with the following schema:
+{schema_str}
+
+And a small sample of the data:
+{df.head().to_string()}
+
+Write Python code to fulfill the following request:
+"{nl_request}"
+
+Your code MUST:
+1.  Assume `df` is already loaded.
+2.  If generating a plot, assign the figure to a variable named `fig` (for Plotly) or use `plt.figure()` (for Matplotlib).
+3.  Provide ONLY the Python code in a single code block, without any explanation or surrounding text.
+"""
+                        generated_code = generate_gemini_content(prompt)
+                        if generated_code:
+                            cleaned_code = re.sub(r"```(python)?\n", "", generated_code)
+                            cleaned_code = re.sub(r"```", "", cleaned_code).strip()
+                            st.session_state.current_python_code = cleaned_code
+                            st.success("AI-generated Python code populated in the editor!")
+                            st.experimental_rerun()
+                    else:
+                        st.warning("Please enter a description for the AI to generate code.")
+
+            elif ai_python_task == "Explain Code":
+                code_to_explain = st.text_area("Paste Python code to explain:", height=200, key="ai_python_explain_code")
+                if st.button("🧠 Explain Python Code"):
+                    if code_to_explain:
+                        prompt = f"You are an expert Python developer and teacher. Explain the following Python code step-by-step. Describe what the code does, its purpose, and how it works.\nUse markdown for formatting.\n\nCode:\n```python\n{code_to_explain}\n```"
+                        explanation = generate_gemini_content(prompt)
+                        if explanation:
+                            st.subheader("🤖 AI Code Explanation")
+                            st.markdown(explanation)
+                    else:
+                        st.warning("Please paste some code to explain.")
+
+        # Code History
+        st.subheader("📚 Python Code History")
+        if st.session_state.python_history:
+            for i, hist in enumerate(reversed(st.session_state.python_history[-5:])):
+                with st.expander(f"Code {len(st.session_state.python_history) - i} ({hist['timestamp']})"):
+                    st.code(hist['code'], language='python')
+                    if st.button("Reuse this code", key=f"reuse_python_{i}"):
+                        st.session_state.current_python_code = hist['code']
+                        st.experimental_rerun()
+        else:
+            st.info("No Python code executed in this session yet.")
 # Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction
 if 'df' in st.session_state and st.session_state.df is not None and 'df' not in locals():
     df = st.session_state.df

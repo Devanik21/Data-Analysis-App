@@ -4830,7 +4830,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
 
         python_code = st.text_area(
             "Enter your Python code here:",
-            value=st.session_state.get('current_python_code', "print(df.head())\n\n# Example Plotly chart:\n# import plotly.express as px\n# fig = px.histogram(df, x=df.columns[0])\n\n# Example Matplotlib plot:\n# import matplotlib.pyplot as plt\n# plt.figure(figsize=(8,6))\n# plt.hist(df.iloc[:,0].dropna())\n# plt.title('Histogram')"),
+            value=st.session_state.get('current_python_code', "print('Python code executed successfully!')\nprint(df.head())\n\n# Example Plotly chart:\n# import plotly.express as px\n# fig = px.histogram(df, x=df.columns[0])\n\n# Example Matplotlib plot:\n# import matplotlib.pyplot as plt\n# plt.figure(figsize=(8,6))\n# plt.hist(df.iloc[:,0].dropna())\n# plt.title('Histogram')"),
             height=300,
             key="python_code_editor"
         )
@@ -4844,6 +4844,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
                     'code': python_code,
                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
+                st.session_state.python_output = "Executing code..." # Provide immediate feedback
                 st.success("Code executed!")
         with col2:
             st.info("Output and plots will appear below.")
@@ -4851,6 +4852,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
         # Display Output
         if 'python_output' in st.session_state and st.session_state.python_output:
             st.subheader("🖥️ Code Output")
+            # Ensure the output is updated after execution completes
             st.code(st.session_state.python_output, language='python')
 
         if st.session_state.python_plots:
@@ -4863,6 +4865,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
             st.subheader("📊 Plotly Figures")
             for i, fig in enumerate(st.session_state.python_plotly_figs):
                 st.plotly_chart(fig, use_container_width=True, key=f"plotly_fig_{i}")
+        st.info("Remember to click 'Execute Code' after generating or modifying code.")
 
         # AI Assistant for Python Code
         st.subheader("🤖 AI Assistant for Python Code")

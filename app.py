@@ -186,7 +186,7 @@ tools = [
     "🐼 Pandas Query Tool",
     "🐍 Python Advanced Analytics",
     "🌐 Web Scraping Tool",
-    "🦄 AI-Powered Insights (Gemini)"
+    "🤖 AI-Powered Insights (Gemini)"
 ]
 
 selected_tool = st.sidebar.selectbox("Select Analysis Tool", tools)
@@ -344,7 +344,7 @@ def generate_gemini_content(prompt_text: str) -> Optional[str]:
         st.error("Gemini model not configured. Please enter your API key in the sidebar.")
         return None
     try:
-        with st.spinner("🦄 Gemini is thinking..."):
+        with st.spinner("🤖 Gemini is thinking..."):
             response = st.session_state.gemini_model.generate_content(prompt_text)
             return response.text
     except Exception as e:
@@ -804,7 +804,7 @@ elif selected_tool == "🔍 SQL Query Engine":
             st.session_state.sql_params = edited_params
 
             # AI Query Generator
-            st.subheader("🦄 AI Query Assistant")
+            st.subheader("🤖 AI Query Assistant")
             if not st.session_state.gemini_model:
                 st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
             else:
@@ -967,7 +967,7 @@ Format your response using markdown.
 """
                         optimization_suggestion = generate_gemini_content(prompt)
                         if optimization_suggestion:
-                            st.subheader("🦄 AI Optimization Suggestion")
+                            st.subheader("🤖 AI Optimization Suggestion")
                             st.markdown(optimization_suggestion)
             # The 'Format Query' button functionality has been removed as per the request
             # to remove dependency on 'sql_formatter.api'.
@@ -982,7 +982,7 @@ Format your response using markdown.
                 
                 # --- AI Interpretation Button ---
                 if not result_df.empty:
-                    if st.button("🦄 Interpret Results with AI"):
+                    if st.button("🤖 Interpret Results with AI"):
                         if not st.session_state.gemini_model:
                             st.warning("Enter your Google AI API Key to use this feature.")
                         else:
@@ -1002,7 +1002,7 @@ Focus on the business or analytical implications of the findings.
 """
                             interpretation = generate_gemini_content(prompt)
                             if interpretation:
-                                st.subheader("🦄 AI Result Interpretation")
+                                st.subheader("🤖 AI Result Interpretation")
                                 st.markdown(interpretation)
 
                 # Export options
@@ -1191,7 +1191,7 @@ elif selected_tool == "📊 Exploratory Data Analysis (EDA)":
                         else:
                             st.warning("The data does not appear to be normally distributed.")
                         
-                        if st.button("🦄 Get AI Interpretation", key="dist_ai_interp"):
+                        if st.button("🤖 Get AI Interpretation", key="dist_ai_interp"):
                             if not st.session_state.gemini_model:
                                 st.warning("Please configure your Google AI API Key in the sidebar.")
                             else:
@@ -1218,7 +1218,7 @@ Use markdown for formatting.
                                 interpretation = generate_gemini_content(prompt)
                                 if interpretation:
                                     st.markdown("---")
-                                    st.markdown("#### 🦄 AI-Powered Interpretation")
+                                    st.markdown("#### 🤖 AI-Powered Interpretation")
                                     st.markdown(interpretation)
 
                 st.markdown("---")
@@ -4574,8 +4574,8 @@ for title in titles:
             scrape_website(url, method, scrape_params, export_format)
 
 # --- AI-Powered Insights (Gemini) ---
-if selected_tool == "🦄 AI-Powered Insights (Gemini)":
-    st.markdown('<h2 class="tool-header">🦄 AI-Powered Insights (Gemini)</h2>', unsafe_allow_html=True)
+if selected_tool == "🤖 AI-Powered Insights (Gemini)":
+    st.markdown('<h2 class="tool-header">🤖 AI-Powered Insights (Gemini)</h2>', unsafe_allow_html=True)
 
     if st.session_state.df is None:
         st.warning("Please upload data first to use AI insights!")
@@ -4714,7 +4714,7 @@ Your code MUST:
                                 st.error(f"Attempt {attempt + 1} failed: {e}")
                                 # This block was incorrectly indented. It should be at the same level as the st.error above.
                                 if attempt < max_retries:
-                                    st.info("🦄 The code failed. Asking Gemini for a fix...")
+                                    st.info("🤖 The code failed. Asking Gemini for a fix...")
                                     with st.spinner("Attempting to self-correct the code..."):
                                         fix_prompt = f"""You are a Python debugging expert. The following code, intended to generate a Plotly chart, failed with an error.
 Original user request: "{chart_request}"
@@ -4852,7 +4852,10 @@ elif selected_tool == "🐍 Python Advanced Analytics":
                 st.success("Code execution complete!")
         with col2:
             st.info("Output and plots will appear below.")
-
+        
+        # Load Example Snippet
+        st.subheader("📚 Load Example Snippet")
+        
         # Display Output
         if 'python_output' in st.session_state and st.session_state.python_output:
             st.subheader("🖥️ Code Output")
@@ -4869,6 +4872,129 @@ elif selected_tool == "🐍 Python Advanced Analytics":
             st.subheader("📊 Plotly Figures")
             for i, fig in enumerate(st.session_state.python_plotly_figs):
                 st.plotly_chart(fig, use_container_width=True, key=f"plotly_fig_{i}")
+        
+        # Example Snippets
+        example_snippets = {
+            "Select an example...": "",
+            "ML: Simple Classification": """
+# Example: Simple Classification Model
+# Predict a binary target based on two numeric features
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score
+
+# Ensure 'df' has numeric columns and a target column
+if 'target_column' in df.columns and 'feature1' in df.columns and 'feature2' in df.columns:
+    # Prepare data (replace with your actual column names)
+    X = df[['feature1', 'feature2']].dropna()
+    y = df.loc[X.index, 'target_column'].dropna() # Align target with features
+
+    if len(X) > 10 and len(y) > 10: # Ensure enough data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+        # Train a RandomForestClassifier
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+
+        # Make predictions
+        y_pred = model.predict(X_test)
+
+        # Evaluate the model
+        print("Model Accuracy:", accuracy_score(y_test, y_pred))
+        print("\\nClassification Report:")
+        print(classification_report(y_test, y_pred))
+    else:
+        print("Not enough data or specified columns for ML example. Ensure 'target_column', 'feature1', 'feature2' exist and have enough non-null values.")
+else:
+    print("Please ensure 'target_column', 'feature1', and 'feature2' exist in your DataFrame for this example.")
+""",
+            "Time Series: Basic Forecasting": """
+# Example: Basic Time Series Forecasting (ARIMA)
+# Requires a datetime index and a numeric column
+from statsmodels.tsa.arima.model import ARIMA
+
+# Assuming 'df' has a datetime index and a numeric column 'value_column'
+# If not, you might need to set it up first:
+# df['date_col'] = pd.to_datetime(df['date_col'])
+# df = df.set_index('date_col')
+
+if isinstance(df.index, pd.DatetimeIndex) and 'value_column' in df.columns:
+    ts_data = df['value_column'].dropna()
+
+    if len(ts_data) > 20: # ARIMA needs sufficient data
+        # Fit ARIMA model (p,d,q) - example (1,1,1)
+        # You might need to determine optimal p,d,q using ACF/PACF plots or auto_arima
+        model = ARIMA(ts_data, order=(1,1,1))
+        model_fit = model.fit()
+
+        print(model_fit.summary())
+
+        # Forecast next 5 steps
+        forecast = model_fit.forecast(steps=5)
+        print("\\nForecast for next 5 periods:")
+        print(forecast)
+
+        # Plotting forecast
+        # import plotly.graph_objects as go
+        # fig = go.Figure()
+        # fig.add_trace(go.Scatter(x=ts_data.index, y=ts_data, mode='lines', name='Observed'))
+        # fig.add_trace(go.Scatter(x=forecast.index, y=forecast, mode='lines', name='Forecast', line=dict(dash='dash')))
+        # fig.update_layout(title='Time Series Forecast')
+    else:
+        print("Not enough data points in 'value_column' for time series forecasting (min 20 recommended).")
+else:
+    print("Please ensure your DataFrame has a DatetimeIndex and a 'value_column' for this example.")
+""",
+            "NLP: Text Preprocessing & Word Cloud": """
+# Example: Text Preprocessing and Word Cloud
+# Requires a text column
+from wordcloud import WordCloud
+import re
+
+# Assuming 'df' has a text column named 'text_column'
+if 'text_column' in df.columns:
+    text_data = df['text_column'].dropna().astype(str)
+
+    if not text_data.empty:
+        # Basic text cleaning
+        cleaned_text = text_data.apply(lambda x: re.sub(r'[^a-zA-Z\s]', '', x.lower()))
+        full_text_corpus = " ".join(cleaned_text)
+
+        if full_text_corpus.strip():
+            # Generate Word Cloud
+            wordcloud = WordCloud(width=800, height=400, background_color='white').generate(full_text_corpus)
+
+            # Display Word Cloud using Matplotlib
+            # import matplotlib.pyplot as plt
+            # plt.figure(figsize=(10, 5))
+            # plt.imshow(wordcloud, interpolation='bilinear')
+            # plt.axis('off')
+            # plt.title('Word Cloud for Text Column')
+            # plt.show() # This will be captured by the Streamlit display
+
+            print("Text preprocessing complete. Word cloud generated (if matplotlib is used).")
+            print("\\nFirst 1000 characters of processed text:")
+            print(full_text_corpus[:1000] + "..." if len(full_text_corpus) > 1000 else full_text_corpus)
+        else:
+            print("No text found in 'text_column' after cleaning.")
+    else:
+        print("The 'text_column' is empty or contains only null values.")
+else:
+    print("Please ensure your DataFrame has a 'text_column' for this example.")
+"""
+        }
+        
+        selected_example = st.selectbox(
+            "Choose an example to load into the editor:",
+            options=list(example_snippets.keys()),
+            key="load_example_snippet_select"
+        )
+        
+        if selected_example != "Select an example...":
+            if st.button("Load Selected Example", use_container_width=True):
+                st.session_state.current_python_code = example_snippets[selected_example]
+                st.info(f"Example '{selected_example}' loaded into editor. Remember to adjust column names!")
+                st.rerun()
         
         # Saved Python Code Snippets
         st.subheader("💾 Saved Python Code Snippets")
@@ -4905,14 +5031,16 @@ elif selected_tool == "🐍 Python Advanced Analytics":
             st.info("No saved snippets yet.")
 
         # AI Assistant for Python Code
-        st.subheader("🦄 AI Assistant for Python Code")
+        st.subheader("🤖 AI Assistant for Python Code")
         if not st.session_state.gemini_model:
             st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
         else: # Line 5003
             ai_python_task = st.selectbox("Select AI Task", [
                 "Explain Code",
                 "Generate Code from Natural Language", # Re-adding this one
+                "Perform Code Review", # New AI Feature
                 "Refactor Python Code",
+                "Generate Unit Tests", # New AI Feature
                 "Optimize Python Code",
                 "Debug Python Code",
                 "Automated Data Profiling",
@@ -4975,7 +5103,7 @@ Your code MUST:
                         prompt = f"You are an expert Python developer and teacher. Explain the following Python code step-by-step. Describe what the code does, its purpose, and how it works.\nUse markdown for formatting.\n\nCode:\n```python\n{code_to_explain}\n```"
                         explanation = generate_gemini_content(prompt)
                         if explanation:
-                            st.subheader("🦄 AI Code Explanation")
+                            st.subheader("🤖 AI Code Explanation")
                             st.markdown(explanation)
                     else:
                         st.warning("Please paste some code to explain.")
@@ -4991,6 +5119,41 @@ Your code MUST:
                             st.markdown(refactored_code)
                     else:
                         st.warning("Please paste some code to refactor.")
+
+            elif ai_python_task == "Perform Code Review":
+                st.subheader("🧐 Perform Code Review")
+                code_to_review = st.text_area("Paste Python code to review:", height=200, key="ai_python_review_code")
+                if st.button("🔍 Get Code Review"):
+                    if code_to_review:
+                        prompt = f"""You are an expert Python software engineer and code reviewer.
+Review the following Python code for:
+- Readability and clarity
+- Efficiency and performance
+- Adherence to best practices (PEP 8, idiomatic Python)
+- Potential bugs or edge cases
+- Maintainability and extensibility
+
+Provide constructive feedback and suggestions for improvement.
+Use markdown for formatting, including code examples for suggested changes.
+
+Code:\n```python\n{code_to_review}\n```"""
+                        review_feedback = generate_gemini_content(prompt)
+                        if review_feedback:
+                            st.markdown(review_feedback)
+                    else:
+                        st.warning("Please paste some code to review.")
+
+            elif ai_python_task == "Generate Unit Tests":
+                st.subheader("🧪 Generate Unit Tests")
+                code_for_tests = st.text_area("Paste Python function(s) to generate unit tests for:", height=200, key="ai_python_unit_test_code")
+                if st.button("✨ Generate Tests"):
+                    if code_for_tests:
+                        prompt = f"You are an expert Python developer specializing in unit testing. Generate simple unit tests for the following Python code (function(s)) using the `unittest` module. Focus on basic functionality and edge cases. Provide only the Python code in a single code block.\n\nCode:\n```python\n{code_for_tests}\n```"
+                        unit_tests = generate_gemini_content(prompt)
+                        if unit_tests:
+                            st.code(unit_tests, language='python')
+                    else:
+                        st.warning("Please paste some code to generate tests for.")
 
             elif ai_python_task == "Optimize Python Code":
                 st.subheader("⚡ Optimize Python Code")
@@ -5117,7 +5280,7 @@ Provide Python code to visualize their relationship (e.g., scatter plot, pair pl
                                 st.markdown(relationship_explanation)
 
             elif ai_python_task == "Recommend ML Model":
-                st.subheader("🦄 Recommend ML Model")
+                st.subheader("🤖 Recommend ML Model")
                 if df.empty:
                     st.warning("DataFrame is empty. Please upload data.")
                 else:

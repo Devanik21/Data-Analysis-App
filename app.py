@@ -4816,7 +4816,7 @@ If no features of a certain type are applicable, don't include that section.
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics</h2>', unsafe_allow_html=True)
 
-    if st.session_state.df is None:
+    if st.session_state.df is None: # Line 4855
         st.warning("Please upload data first!")
     else:
         df = st.session_state.df
@@ -4855,7 +4855,7 @@ elif selected_tool == "🐍 Python Advanced Analytics":
         if st.session_state.python_plots:
             st.subheader("📈 Matplotlib/Seaborn Plots")
             for i, fig in enumerate(st.session_state.python_plots):
-                st.pyplot(fig, key=f"mpl_plot_{i}")
+                st.pyplot(fig)
                 # plt.close(fig) # Handled by plt.close('all') in execute_python_code
 
         if st.session_state.python_plotly_figs:

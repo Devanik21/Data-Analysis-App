@@ -169,7 +169,7 @@ if loaded_session_file is not None:
         for key, value in loaded_state.items():
             st.session_state[key] = value
         st.sidebar.success("Session loaded successfully! Refreshing app...")
-        st.rerun()
+        st.experimental_rerun()
     except Exception as e:
         st.sidebar.error(f"Error loading session file: {e}. The file may be corrupted or from an incompatible version.")
 
@@ -407,6 +407,7 @@ def execute_python_code(code: str, df: pd.DataFrame) -> None:
         st.session_state.python_output = output_buffer.getvalue()
     finally:
         # Restore stdout
+        plt.close('all') # Close all matplotlib figures to free memory
         sys.stdout = original_stdout
 
 def scrape_website(url: str, method: str, params: dict, export_format: str) -> None:
@@ -655,7 +656,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                         df_cleaned.dropna(subset=[missing_col], inplace=True)
                         st.session_state.df = df_cleaned
                         st.success(f"Dropped rows with NaNs in '{missing_col}'. New shape: {df_cleaned.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
 
             st.markdown("#### 🔄 Change Data Type")
             type_col = st.selectbox("Select column to change type", df.columns.tolist(), key="clean_type_col")
@@ -670,7 +671,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                             df_typed[type_col] = df_typed[type_col].astype(new_type)
                         st.session_state.df = df_typed
                         st.success(f"Converted '{type_col}' to {new_type}.")
-                        st.rerun()
+                        st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Error converting type: {e}")
 
@@ -680,7 +681,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                 removed_count = len(df) - len(df_no_duplicates)
                 st.session_state.df = df_no_duplicates
                 st.success(f"Removed {removed_count} duplicate rows. New shape: {df_no_duplicates.shape}")
-                st.rerun()
+                st.experimental_rerun()
 
             st.markdown("#### ✏️ Rename Columns")
             col_to_rename = st.selectbox("Select column to rename", df.columns.tolist(), key="rename_col_select")
@@ -692,7 +693,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                         df_renamed.rename(columns={col_to_rename: new_col_name_rename}, inplace=True)
                         st.session_state.df = df_renamed
                         st.success(f"Column '{col_to_rename}' renamed to '{new_col_name_rename}'.")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.warning("Please enter a valid new column name different from the original.")
             
@@ -703,7 +704,7 @@ if selected_tool == "📤 Data Upload": # Keep this as the first tool
                     df_dropped = df.drop(columns=cols_to_drop)
                     st.session_state.df = df_dropped
                     st.success(f"Dropped columns: {', '.join(cols_to_drop)}. New shape: {df_dropped.shape}")
-                    st.rerun()
+                    st.experimental_rerun()
                 else:
                     st.warning("Please select at least one column to drop.")
 
@@ -830,7 +831,7 @@ elif selected_tool == "🔍 SQL Query Engine":
                                 cleaned_sql = re.sub(r"```", "", cleaned_sql).strip()
                                 st.session_state.current_query = cleaned_sql
                                 st.success("AI-generated SQL populated in the editor!")
-                                st.rerun() # Rerun to update the text_area
+                                st.experimental_rerun() # Rerun to update the text_area
                         else:
                             st.warning("Please enter a description for the AI to generate a query.")
 
@@ -843,7 +844,7 @@ elif selected_tool == "🔍 SQL Query Engine":
                         st.caption(f"Rows: {hist['rows']} | Duration: {hist.get('duration', 0.0):.4f}s")
                         if st.button("Reuse this query", key=f"reuse_sql_{i}"):
                             st.session_state.current_query = hist['query']
-                            st.rerun()
+                            st.experimental_rerun()
             else:
                 st.info("No queries run in this session yet.")
             
@@ -863,7 +864,7 @@ elif selected_tool == "🔍 SQL Query Engine":
                     if query_name and query_name in st.session_state.saved_sql_queries:
                         del st.session_state.saved_sql_queries[query_name]
                         st.success(f"Query '{query_name}' deleted!")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.warning("Enter the name of an existing query to delete.")
 
@@ -872,7 +873,7 @@ elif selected_tool == "🔍 SQL Query Engine":
                 if saved_query_to_load:
                     st.session_state.current_query = st.session_state.saved_sql_queries[saved_query_to_load]
                     st.info(f"Query '{saved_query_to_load}' loaded into editor.")
-                    st.rerun()
+                    st.experimental_rerun()
 
         with main_col:
             st.subheader("✍️ SQL Query Editor")
@@ -922,7 +923,7 @@ elif selected_tool == "🔍 SQL Query Engine":
                             st.session_state.sql_result = None # Clear previous query results
                             st.success(f"DML query executed successfully in {duration:.4f}s. The data has been updated.")
                             st.info("The main DataFrame has been updated. Rerunning to reflect changes across the app.")
-                            st.rerun()
+                            st.experimental_rerun()
                         else:
                             # This is a SELECT query
                             st.session_state.sql_result = result
@@ -4410,7 +4411,7 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
                             df.set_index(potential_time_col, inplace=True)
                             st.session_state.df = df
                             st.success(f"Converted '{potential_time_col}' to datetime index.")
-                            st.rerun() # Rerun to update the selectbox
+                            st.experimental_rerun() # Rerun to update the selectbox
                         except Exception as e:
                             st.error(f"Error converting to datetime index: {e}")
                 else:
@@ -4422,7 +4423,7 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
                                 df.set_index(set_index_col, inplace=True)
                                 st.session_state.df = df
                                 st.success(f"'{set_index_col}' set as datetime index.")
-                                st.rerun()
+                                st.experimental_rerun()
                             except Exception as e:
                                 st.error(f"Error setting index: {e}")
                     
@@ -4901,7 +4902,7 @@ Your code MUST:
                             cleaned_code = re.sub(r"```", "", cleaned_code).strip()
                             st.session_state.current_python_code = cleaned_code
                             st.success("AI-generated Python code populated in the editor!")
-                            st.rerun()
+                            st.experimental_rerun()
                     else:
                         st.warning("Please enter a description for the AI to generate code.")
 
@@ -4925,7 +4926,7 @@ Your code MUST:
                     st.code(hist['code'], language='python')
                     if st.button("Reuse this code", key=f"reuse_python_{i}"):
                         st.session_state.current_python_code = hist['code']
-                        st.rerun()
+                        st.experimental_rerun()
         else:
             st.info("No Python code executed in this session yet.")
 # Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction

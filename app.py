@@ -4894,7 +4894,8 @@ Write Python code to fulfill the following request:
 Your code MUST:
 1.  Assume `df` is already loaded.
 2.  If generating a plot, assign the figure to a variable named `fig` (for Plotly) or use `plt.figure()` (for Matplotlib).
-3.  Provide ONLY the Python code in a single code block, without any explanation or surrounding text.
+3.  If the request implies a textual or numerical output (e.g., a calculation, a DataFrame head, a summary), use `print()` to display it.
+4.  Provide ONLY the Python code in a single code block, without any explanation or surrounding text.
 """
                         generated_code = generate_gemini_content(prompt)
                         if generated_code:

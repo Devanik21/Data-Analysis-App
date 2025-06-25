@@ -5016,45 +5016,123 @@ Your code MUST:
                         st.warning("Please paste some code to debug.")
 
             elif ai_python_task == "Automated Data Profiling":
-                st.subheader("📈 Automated Data Profiling")
+                st.subheader("📊 Automated Data Profiling")
                 if st.button("Generate Data Profile"):
-                    prompt = f"You are an expert data analyst. Generate a comprehensive data profile for the following pandas DataFrame schema and sample data. Focus on data types, missing values, unique values, basic statistics, and potential issues.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
+                    if df.empty:
+                        st.warning("DataFrame is empty. Please upload data.")
+                        profile = None
+                    else:
+                        prompt = f"You are an expert data analyst. Generate a comprehensive data profile for the following pandas DataFrame schema and sample data. Focus on data types, missing values, unique values, basic statistics, and potential issues. Provide the output in markdown format.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
                     profile = generate_gemini_content(prompt)
                     if profile:
                         st.markdown(profile)
 
             elif ai_python_task == "Predict Missing Values":
                 st.subheader("🔮 Predict Missing Values")
-                st.info("This feature would use AI to suggest methods or even predict missing values for selected columns.")
-                st.warning("Implementation requires advanced ML models and careful consideration of data types and relationships.")
+                missing_value_cols = [col for col in df.columns if df[col].isnull().any()]
+                if not missing_value_cols:
+                    st.info("No columns with missing values found in the DataFrame.")
+                else:
+                    missing_value_col = st.selectbox("Select column with missing values to analyze:", missing_value_cols, key="ai_predict_missing_col")
+                    if st.button("Get Missing Value Prediction Suggestions"):
+                        prompt = f"""You are an expert data scientist. Given a pandas DataFrame `df` with the following schema:
+Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
+
+The column '{missing_value_col}' has missing values. Suggest methods to predict or impute these missing values.
+Provide Python code for a simple imputation method (e.g., mean, median, mode) and suggest an advanced ML-based method (e.g., KNNImputer, IterativeImputer) with conceptual code.
+Explain the pros and cons of each suggested method for this specific column.
+"""
+                        prediction_suggestions = generate_gemini_content(prompt)
+                        if prediction_suggestions:
+                            st.markdown(prediction_suggestions)
 
             elif ai_python_task == "Identify Data Anomalies":
                 st.subheader("🚨 Identify Data Anomalies")
-                st.info("This feature would use AI to detect unusual patterns or outliers in your dataset.")
-                st.warning("Implementation requires defining 'anomaly' and appropriate detection algorithms.")
+                numeric_cols_anomaly = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols_anomaly:
+                    st.info("No numeric columns found for anomaly detection.")
+                else:
+                    anomaly_col = st.selectbox("Select numeric column to check for anomalies:", numeric_cols_anomaly, key="ai_anomaly_col")
+                    if st.button("Identify Anomalies"):
+                        prompt = f"""You are an expert data analyst specializing in anomaly detection. Given a pandas DataFrame `df` with the following schema:
+Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
+
+Identify potential data anomalies/outliers in the column '{anomaly_col}'.
+Explain the method you would use (e.g., IQR, Z-score, Isolation Forest) and list the indices of anomalous rows if any are found in the sample data.
+Provide Python code to identify these anomalies.
+"""
+                        anomaly_report = generate_gemini_content(prompt)
+                        if anomaly_report:
+                            st.markdown(anomaly_report)
 
             elif ai_python_task == "Suggest Data Cleaning Steps":
                 st.subheader("🧹 Suggest Data Cleaning Steps")
                 if st.button("Get Cleaning Suggestions"):
-                    prompt = f"You are an expert in data cleaning. Based on the following DataFrame schema and sample data, suggest specific data cleaning steps (e.g., handling missing values, correcting data types, removing duplicates, addressing outliers). Provide the rationale and example pandas code for each.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
+                    if df.empty:
+                        st.warning("DataFrame is empty. Please upload data.")
+                        cleaning_suggestions = None
+                    else:
+                        prompt = f"You are an expert in data cleaning. Based on the following DataFrame schema and sample data, suggest specific data cleaning steps (e.g., handling missing values, correcting data types, removing duplicates, addressing outliers). Provide the rationale and example pandas code for each.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
                     cleaning_suggestions = generate_gemini_content(prompt)
                     if cleaning_suggestions:
                         st.markdown(cleaning_suggestions)
 
             elif ai_python_task == "Interpret Statistical Results":
                 st.subheader("📊 Interpret Statistical Results")
-                st.info("This feature would take statistical output (e.g., from a t-test, ANOVA, regression) and provide a plain-language interpretation.")
-                st.warning("Implementation requires structured input of statistical results.")
+                stat_results_input = st.text_area("Paste statistical output (e.g., t-test, ANOVA, regression summary) here:", height=200, key="ai_stat_results_input")
+                if st.button("Interpret Results"):
+                    if stat_results_input:
+                        prompt = f"""You are an expert statistician and data analyst. Interpret the following statistical results in plain language.
+Explain what the results mean, their significance, and any implications for the data or problem being studied.
+
+Statistical Results:\n```\n{stat_results_input}\n```
+"""
+                        interpretation = generate_gemini_content(prompt)
+                        if interpretation:
+                            st.markdown(interpretation)
+                    else:
+                        st.warning("Please paste statistical results to interpret.")
 
             elif ai_python_task == "Explain Data Relationships":
                 st.subheader("🔗 Explain Data Relationships")
-                st.info("This feature would use AI to describe the relationships between selected columns (e.g., correlation, causation, dependency).")
-                st.warning("Implementation requires defining how relationships are inferred (e.g., correlation matrix, causal inference).")
+                if df.empty:
+                    st.warning("DataFrame is empty. Please upload data.")
+                else:
+                    cols_for_relationship = st.multiselect("Select columns to explain relationships:", df.columns.tolist(), default=df.columns.tolist()[:2], key="ai_relationship_cols")
+                    if st.button("Explain Relationships"):
+                        if len(cols_for_relationship) < 2:
+                            st.warning("Please select at least two columns to explain relationships.")
+                        else:
+                            prompt = f"""You are an expert data analyst. Given a pandas DataFrame `df` with the following schema:
+Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
+
+Explain the relationship between the following columns: {', '.join(cols_for_relationship)}.
+Discuss potential correlations, dependencies, and any observed patterns.
+Provide Python code to visualize their relationship (e.g., scatter plot, pair plot, or bar chart depending on data types).
+"""
+                            relationship_explanation = generate_gemini_content(prompt)
+                            if relationship_explanation:
+                                st.markdown(relationship_explanation)
 
             elif ai_python_task == "Recommend ML Model":
                 st.subheader("🤖 Recommend ML Model")
-                st.info("This feature would analyze your data and task (e.g., classification, regression) to recommend suitable machine learning models.")
-                st.warning("Implementation requires defining the ML task and criteria for model selection.")
+                if df.empty:
+                    st.warning("DataFrame is empty. Please upload data.")
+                else:
+                    target_col_ml = st.selectbox("Select target column:", df.columns.tolist(), key="ai_ml_target_col")
+                    ml_task = st.radio("Select ML Task:", ["Classification", "Regression"], key="ai_ml_task")
+                    if st.button("Recommend ML Model"):
+                        prompt = f"""You are an expert machine learning engineer. Given a pandas DataFrame `df` with the following schema:
+Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
+
+The task is to predict the column '{target_col_ml}', which is a {ml_task} problem.
+Recommend suitable machine learning models for this task. For each recommended model:
+1. Explain why it is suitable for this type of data and task.
+2. Provide conceptual Python code for training the model (assuming `X_train`, `y_train` are available).
+"""
+                        model_recommendation = generate_gemini_content(prompt)
+                        if model_recommendation:
+                            st.markdown(model_recommendation)
 
             elif ai_python_task == "Generate Feature Engineering Code":
                 st.subheader("🛠️ Generate Feature Engineering Code")
@@ -5069,19 +5147,75 @@ Your code MUST:
                         st.warning("Please describe the feature engineering task.")
 
             elif ai_python_task == "Explain Model Predictions":
-                st.subheader("🧠 Explain Model Predictions")
-                st.info("This feature would take a trained ML model and a data point, and explain why the model made a particular prediction (e.g., using SHAP or LIME).")
-                st.warning("Implementation requires a trained model object and specific data point input.")
+                st.subheader("🧠 Explain Model Predictions (Conceptual)")
+                st.info("This feature conceptually explains how a model might arrive at a prediction given input features. It does not run a real model.")
+                model_type_exp = st.text_input("Model Type (e.g., RandomForest, LogisticRegression, Neural Network):", key="ai_explain_model_type")
+                features_input_exp = st.text_area("Input features (e.g., {'age': 30, 'income': 50000, 'city': 'New York'}):", height=100, key="ai_explain_features_input")
+                prediction_exp = st.text_input("Model Prediction (e.g., 'Yes', 0.85, 123.45):", key="ai_explain_prediction")
+                if st.button("Explain Prediction"):
+                    if model_type_exp and features_input_exp and prediction_exp:
+                        prompt = f"""You are an expert in Machine Learning Explainability (XAI).
+Given the following:
+- Model Type: {model_type_exp}
+- Input Features: {features_input_exp}
+- Model Prediction: {prediction_exp}
+
+Explain conceptually why the model might have made this prediction. Discuss which features likely contributed most to the prediction and how.
+Use concepts like feature importance, positive/negative contributions, or decision paths (depending on the model type).
+Provide a plain-language explanation.
+"""
+                        explanation = generate_gemini_content(prompt)
+                        if explanation:
+                            st.markdown(explanation)
+                    else:
+                        st.warning("Please provide model type, input features, and the prediction.")
 
             elif ai_python_task == "Suggest Hyperparameters":
                 st.subheader("⚙️ Suggest Hyperparameters")
-                st.info("This feature would suggest optimal hyperparameters for a given ML model and dataset.")
-                st.warning("Implementation requires knowledge of the ML model type and hyperparameter ranges.")
+                if df.empty:
+                    st.warning("DataFrame is empty. Please upload data.")
+                else:
+                    model_name_hp = st.text_input("ML Model Name (e.g., RandomForestClassifier, XGBRegressor, LogisticRegression):", key="ai_hp_model_name")
+                    target_col_hp = st.selectbox("Select target column (optional, for context):", ['None'] + df.columns.tolist(), key="ai_hp_target_col")
+                    target_col_hp_val = None if target_col_hp == 'None' else target_col_hp
+
+                    if st.button("Suggest Hyperparameters"):
+                        if model_name_hp:
+                            prompt = f"""You are an expert machine learning engineer specializing in hyperparameter tuning.
+Given a pandas DataFrame `df` with the following schema:
+Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
+
+For the machine learning model '{model_name_hp}' (and potentially predicting '{target_col_hp_val}' if specified), suggest a set of common and important hyperparameters.
+For each hyperparameter, explain its role and provide a typical range of values to consider for tuning.
+Provide the suggestions in markdown format.
+"""
+                            hyperparameter_suggestions = generate_gemini_content(prompt)
+                            if hyperparameter_suggestions:
+                                st.markdown(hyperparameter_suggestions)
+                        else:
+                            st.warning("Please enter an ML model name.")
 
             elif ai_python_task == "Evaluate Model Performance":
                 st.subheader("📊 Evaluate Model Performance")
-                st.info("This feature would take model predictions and true labels, and provide a comprehensive evaluation report (e.g., accuracy, precision, recall, F1-score, RMSE).")
-                st.warning("Implementation requires predicted and true labels as input.")
+                true_labels_input = st.text_area("True Labels (comma-separated, e.g., 0,1,0,1 or 10.5,12.1,11.0):", height=100, key="ai_eval_true_labels")
+                predictions_input = st.text_area("Model Predictions (comma-separated, e.g., 0,1,1,0 or 10.1,11.9,11.2):", height=100, key="ai_eval_predictions")
+                eval_task = st.radio("Evaluation Task:", ["Classification", "Regression"], key="ai_eval_task")
+                if st.button("Evaluate Performance"):
+                    if true_labels_input and predictions_input:
+                        prompt = f"""You are an expert in machine learning model evaluation.
+Given the following true labels and model predictions:
+- True Labels: {true_labels_input}
+- Model Predictions: {predictions_input}
+- Evaluation Task: {eval_task}
+
+Provide a comprehensive evaluation report. Calculate common metrics (e.g., accuracy, precision, recall, F1-score for classification; MSE, RMSE, R2 for regression).
+Provide Python code to calculate these metrics. Interpret the results in plain language.
+"""
+                        evaluation_report = generate_gemini_content(prompt)
+                        if evaluation_report:
+                            st.markdown(evaluation_report)
+                    else:
+                        st.warning("Please provide both true labels and model predictions.")
 
             elif ai_python_task == "Generate Executive Summary":
                 st.subheader("📝 Generate Executive Summary")

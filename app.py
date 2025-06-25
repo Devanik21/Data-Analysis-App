@@ -4907,7 +4907,28 @@ elif selected_tool == "🐍 Python Advanced Analytics":
         if not st.session_state.gemini_model:
             st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
         else: # Line 5003
-            ai_python_task = st.selectbox("Select AI Task", ["Explain Code"], key="ai_python_task")
+            ai_python_task = st.selectbox("Select AI Task", [
+                "Explain Code",
+                "Generate Code from Natural Language", # Re-adding this one
+                "Refactor Python Code",
+                "Optimize Python Code",
+                "Debug Python Code",
+                "Automated Data Profiling",
+                "Predict Missing Values",
+                "Identify Data Anomalies",
+                "Suggest Data Cleaning Steps",
+                "Interpret Statistical Results",
+                "Explain Data Relationships",
+                "Recommend ML Model",
+                "Generate Feature Engineering Code",
+                "Explain Model Predictions",
+                "Suggest Hyperparameters",
+                "Evaluate Model Performance",
+                "Generate Executive Summary",
+                "Summarize Key Findings",
+                "Translate Code Comments",
+                "Generate Documentation"
+            ], key="ai_python_task")
 
             if ai_python_task == "Generate Code from Natural Language":
                 nl_request = st.text_area(
@@ -4956,6 +4977,160 @@ Your code MUST:
                             st.markdown(explanation)
                     else:
                         st.warning("Please paste some code to explain.")
+
+            elif ai_python_task == "Refactor Python Code":
+                st.subheader("💡 Refactor Python Code")
+                code_to_refactor = st.text_area("Paste Python code to refactor:", height=200, key="ai_python_refactor_code")
+                if st.button("✨ Get Refactored Code"):
+                    if code_to_refactor:
+                        prompt = f"You are an expert Python developer. Refactor the following code for better readability, maintainability, and Pythonic style. Provide only the refactored code in a single code block, followed by a brief explanation of the changes.\n\nCode:\n```python\n{code_to_refactor}\n```"
+                        refactored_code = generate_gemini_content(prompt)
+                        if refactored_code:
+                            st.markdown(refactored_code)
+                    else:
+                        st.warning("Please paste some code to refactor.")
+
+            elif ai_python_task == "Optimize Python Code":
+                st.subheader("⚡ Optimize Python Code")
+                code_to_optimize = st.text_area("Paste Python code to optimize:", height=200, key="ai_python_optimize_code")
+                if st.button("🚀 Get Optimized Code"):
+                    if code_to_optimize:
+                        prompt = f"You are an expert Python performance engineer. Optimize the following code for speed and efficiency. Provide only the optimized code in a single code block, followed by a brief explanation of the optimizations.\n\nCode:\n```python\n{code_to_optimize}\n```"
+                        optimized_code = generate_gemini_content(prompt)
+                        if optimized_code:
+                            st.markdown(optimized_code)
+                    else:
+                        st.warning("Please paste some code to optimize.")
+
+            elif ai_python_task == "Debug Python Code":
+                st.subheader("🐛 Debug Python Code")
+                code_to_debug = st.text_area("Paste Python code to debug:", height=200, key="ai_python_debug_code")
+                error_message = st.text_area("Paste any error message (optional):", height=100, key="ai_python_debug_error")
+                if st.button("🔍 Get Debugging Help"):
+                    if code_to_debug:
+                        prompt = f"You are an expert Python debugger. Analyze the following code and provide debugging suggestions. If an error message is provided, explain the error and suggest a fix.\n\nCode:\n```python\n{code_to_debug}\n```\nError Message:\n```\n{error_message}\n```"
+                        debug_help = generate_gemini_content(prompt)
+                        if debug_help:
+                            st.markdown(debug_help)
+                    else:
+                        st.warning("Please paste some code to debug.")
+
+            elif ai_python_task == "Automated Data Profiling":
+                st.subheader("📈 Automated Data Profiling")
+                if st.button("Generate Data Profile"):
+                    prompt = f"You are an expert data analyst. Generate a comprehensive data profile for the following pandas DataFrame schema and sample data. Focus on data types, missing values, unique values, basic statistics, and potential issues.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
+                    profile = generate_gemini_content(prompt)
+                    if profile:
+                        st.markdown(profile)
+
+            elif ai_python_task == "Predict Missing Values":
+                st.subheader("🔮 Predict Missing Values")
+                st.info("This feature would use AI to suggest methods or even predict missing values for selected columns.")
+                st.warning("Implementation requires advanced ML models and careful consideration of data types and relationships.")
+
+            elif ai_python_task == "Identify Data Anomalies":
+                st.subheader("🚨 Identify Data Anomalies")
+                st.info("This feature would use AI to detect unusual patterns or outliers in your dataset.")
+                st.warning("Implementation requires defining 'anomaly' and appropriate detection algorithms.")
+
+            elif ai_python_task == "Suggest Data Cleaning Steps":
+                st.subheader("🧹 Suggest Data Cleaning Steps")
+                if st.button("Get Cleaning Suggestions"):
+                    prompt = f"You are an expert in data cleaning. Based on the following DataFrame schema and sample data, suggest specific data cleaning steps (e.g., handling missing values, correcting data types, removing duplicates, addressing outliers). Provide the rationale and example pandas code for each.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
+                    cleaning_suggestions = generate_gemini_content(prompt)
+                    if cleaning_suggestions:
+                        st.markdown(cleaning_suggestions)
+
+            elif ai_python_task == "Interpret Statistical Results":
+                st.subheader("📊 Interpret Statistical Results")
+                st.info("This feature would take statistical output (e.g., from a t-test, ANOVA, regression) and provide a plain-language interpretation.")
+                st.warning("Implementation requires structured input of statistical results.")
+
+            elif ai_python_task == "Explain Data Relationships":
+                st.subheader("🔗 Explain Data Relationships")
+                st.info("This feature would use AI to describe the relationships between selected columns (e.g., correlation, causation, dependency).")
+                st.warning("Implementation requires defining how relationships are inferred (e.g., correlation matrix, causal inference).")
+
+            elif ai_python_task == "Recommend ML Model":
+                st.subheader("🤖 Recommend ML Model")
+                st.info("This feature would analyze your data and task (e.g., classification, regression) to recommend suitable machine learning models.")
+                st.warning("Implementation requires defining the ML task and criteria for model selection.")
+
+            elif ai_python_task == "Generate Feature Engineering Code":
+                st.subheader("🛠️ Generate Feature Engineering Code")
+                fe_request = st.text_area("Describe the feature you want to engineer (e.g., 'create a new column for age groups', 'combine first and last name'):", height=100, key="ai_python_fe_request")
+                if st.button("✨ Generate FE Code"):
+                    if fe_request:
+                        prompt = f"You are an expert in feature engineering using pandas. Given a DataFrame `df` with schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nWrite Python code to perform the following feature engineering task:\n'{fe_request}'\n\nProvide only the Python code in a single code block, without explanation. Assume `df` is available."
+                        fe_code = generate_gemini_content(prompt)
+                        if fe_code:
+                            st.code(fe_code, language='python')
+                    else:
+                        st.warning("Please describe the feature engineering task.")
+
+            elif ai_python_task == "Explain Model Predictions":
+                st.subheader("🧠 Explain Model Predictions")
+                st.info("This feature would take a trained ML model and a data point, and explain why the model made a particular prediction (e.g., using SHAP or LIME).")
+                st.warning("Implementation requires a trained model object and specific data point input.")
+
+            elif ai_python_task == "Suggest Hyperparameters":
+                st.subheader("⚙️ Suggest Hyperparameters")
+                st.info("This feature would suggest optimal hyperparameters for a given ML model and dataset.")
+                st.warning("Implementation requires knowledge of the ML model type and hyperparameter ranges.")
+
+            elif ai_python_task == "Evaluate Model Performance":
+                st.subheader("📊 Evaluate Model Performance")
+                st.info("This feature would take model predictions and true labels, and provide a comprehensive evaluation report (e.g., accuracy, precision, recall, F1-score, RMSE).")
+                st.warning("Implementation requires predicted and true labels as input.")
+
+            elif ai_python_task == "Generate Executive Summary":
+                st.subheader("📝 Generate Executive Summary")
+                analysis_summary_input = st.text_area("Paste your analysis findings or key data points here:", height=200, key="ai_python_exec_summary_input")
+                if st.button("✨ Generate Summary"):
+                    if analysis_summary_input:
+                        prompt = f"You are an expert business analyst. Based on the following analysis findings, generate a concise executive summary (approx. 150-200 words) highlighting key insights, implications, and recommendations.\n\nFindings:\n{analysis_summary_input}"
+                        exec_summary = generate_gemini_content(prompt)
+                        if exec_summary:
+                            st.markdown(exec_summary)
+                    else:
+                        st.warning("Please provide some analysis findings.")
+
+            elif ai_python_task == "Summarize Key Findings":
+                st.subheader("📄 Summarize Key Findings")
+                findings_input = st.text_area("Paste your detailed findings or report sections here:", height=200, key="ai_python_summarize_findings_input")
+                if st.button("✨ Summarize Findings"):
+                    if findings_input:
+                        prompt = f"You are an expert summarizer. Condense the following text into bullet points of key findings. Focus on the most important insights and conclusions.\n\nText:\n{findings_input}"
+                        summary_findings = generate_gemini_content(prompt)
+                        if summary_findings:
+                            st.markdown(summary_findings)
+                    else:
+                        st.warning("Please provide text to summarize.")
+
+            elif ai_python_task == "Translate Code Comments":
+                st.subheader("🌐 Translate Code Comments")
+                code_with_comments = st.text_area("Paste code with comments to translate:", height=200, key="ai_python_translate_comments_code")
+                target_language = st.text_input("Target Language (e.g., Spanish, French, Hindi):", value="English", key="ai_python_translate_comments_lang")
+                if st.button("✨ Translate Comments"):
+                    if code_with_comments and target_language:
+                        prompt = f"You are a multilingual programmer. Translate only the comments in the following Python code to {target_language}. Keep the code itself unchanged. Provide only the translated code in a single code block.\n\nCode:\n```python\n{code_with_comments}\n```"
+                        translated_code = generate_gemini_content(prompt)
+                        if translated_code:
+                            st.code(translated_code, language='python')
+                    else:
+                        st.warning("Please paste code and specify a target language.")
+
+            elif ai_python_task == "Generate Documentation":
+                st.subheader("📄 Generate Documentation")
+                code_for_docs = st.text_area("Paste Python code to generate documentation for:", height=200, key="ai_python_generate_docs_code")
+                if st.button("✨ Generate Docs"):
+                    if code_for_docs:
+                        prompt = f"You are an expert technical writer. Generate comprehensive documentation for the following Python code. Include a description of its purpose, parameters, return values, and usage examples. Use markdown for formatting.\n\nCode:\n```python\n{code_for_docs}\n```"
+                        documentation = generate_gemini_content(prompt)
+                        if documentation:
+                            st.markdown(documentation)
+                    else:
+                        st.warning("Please paste code to generate documentation for.")
 
         # Code History
         st.subheader("📚 Python Code History")

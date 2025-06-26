@@ -520,13 +520,13 @@ def scrape_website(
         report_data["Status Code"] = response.status_code
         st.success(f"Successfully fetched URL: {url} (Status: {response.status_code})")
             
-            # Parse HTML
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            results = []
-            exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re, 'requests': requests} # Add 'requests' for custom code
-            
-            if method == "Extract Text by Tag":
+        # Parse HTML
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        results = []
+        exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re, 'requests': requests} # Add 'requests' for custom code
+        
+        if method == "Extract Text by Tag":
                 tag = method_params.get('tag', 'p')
                 class_name = method_params.get('class_name', '')
                 limit = method_params.get('limit', 10)

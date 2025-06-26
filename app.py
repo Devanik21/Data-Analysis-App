@@ -4985,6 +4985,589 @@ If no features of a certain type are applicable, don't include that section.
                 else:
                     st.warning("Please paste some code to explain.")
 
+        elif selected_ai_task == "📖 Data Storytelling/Narrative Generation":
+            st.subheader("📖 Data Storytelling/Narrative Generation")
+            story_input = st.text_area("Provide key findings, insights, or data points you want to weave into a story:", height=150, key="ai_story_input")
+            if st.button("Generate Data Story", type="primary"):
+                if story_input:
+                    prompt = f"""You are an expert data storyteller and business communicator.
+Given the following data context (DataFrame schema and sample) and key findings/insights:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Key Findings/Insights:
+{story_input}
+
+Weave these findings into a compelling and insightful data story or narrative.
+Focus on the 'so what?' and the implications for a business audience.
+Use clear, engaging language and markdown for formatting.
+"""
+                    story = generate_gemini_content(prompt)
+                    if story:
+                        st.markdown(story)
+                else:
+                    st.warning("Please provide some key findings or insights to generate a story.")
+
+        elif selected_ai_task == "🚨 Anomaly Detection Explanation":
+            st.subheader("🚨 Anomaly Detection Explanation")
+            numeric_cols_anomaly_exp = df.select_dtypes(include=np.number).columns.tolist()
+            if not numeric_cols_anomaly_exp:
+                st.info("No numeric columns found for anomaly explanation.")
+            else:
+                anomaly_col_exp = st.selectbox("Select column where anomalies were detected:", numeric_cols_anomaly_exp, key="ai_anomaly_col_exp")
+                anomalous_values_input = st.text_area("List specific anomalous values or their characteristics (e.g., 'values above 1000', 'outliers at indices 5, 12, 20'):", height=100, key="ai_anomalous_values_input")
+                if st.button("Explain Anomalies", type="primary"):
+                    if anomaly_col_exp and anomalous_values_input:
+                        prompt = f"""You are an expert data analyst specializing in anomaly detection.
+Given the following data context (DataFrame schema and sample) and detected anomalies:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Anomalies detected in column '{anomaly_col_exp}':
+{anomalous_values_input}
+
+Explain the potential meaning, implications, and possible causes of these anomalies.
+Suggest further investigation steps. Use markdown for formatting.
+"""
+                        explanation = generate_gemini_content(prompt)
+                        if explanation:
+                            st.markdown(explanation)
+                    else:
+                        st.warning("Please select a column and describe the anomalies.")
+
+        elif selected_ai_task == "🔍 Root Cause Analysis (Conceptual)":
+            st.subheader("🔍 Root Cause Analysis (Conceptual)")
+            problem_description = st.text_area("Describe the problem or observed symptom:", height=100, key="ai_rca_problem")
+            relevant_cols_rca = st.multiselect("Select relevant columns that might be related to the problem:", df.columns.tolist(), key="ai_rca_cols")
+            if st.button("Suggest Root Causes", type="primary"):
+                if problem_description and relevant_cols_rca:
+                    prompt = f"""You are an expert in root cause analysis for business and data problems.
+Given the following data context (DataFrame schema and sample), an observed problem, and relevant columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Observed Problem:
+{problem_description}
+
+Relevant Columns: {', '.join(relevant_cols_rca)}
+
+Suggest potential root causes for this problem based on the provided context.
+For each potential cause, explain how it might be related to the problem and suggest data-driven ways to investigate it further.
+Use markdown for formatting.
+"""
+                    root_causes = generate_gemini_content(prompt)
+                    if root_causes:
+                        st.markdown(root_causes)
+                else:
+                    st.warning("Please describe the problem and select relevant columns.")
+
+        elif selected_ai_task == "🔮 Predictive Modeling Insights":
+            st.subheader("🔮 Predictive Modeling Insights")
+            target_col_pred_insight = st.selectbox("Select the target column for prediction:", df.columns.tolist(), key="ai_pred_insight_target")
+            model_type_pred_insight = st.text_input("What type of model are you considering (e.g., Regression, Classification, Time Series)?", key="ai_pred_insight_model_type")
+            if st.button("Get Predictive Insights", type="primary"):
+                if target_col_pred_insight and model_type_pred_insight:
+                    prompt = f"""You are an expert in predictive modeling and data science.
+Given the following data context (DataFrame schema and sample):
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+The goal is to predict the column '{target_col_pred_insight}' using a '{model_type_pred_insight}' model.
+
+Provide insights into:
+1.  What kind of predictions can be made (e.g., continuous values, categories, future trends)?
+2.  Which features are likely to be strong predictors and why?
+3.  Potential challenges or considerations for building this predictive model.
+4.  How the predictions could be used in a real-world scenario.
+Use markdown for formatting.
+"""
+                    insights = generate_gemini_content(prompt)
+                    if insights:
+                        st.markdown(insights)
+                else:
+                    st.warning("Please select a target column and specify the model type.")
+
+        elif selected_ai_task == "💡 Hypothesis Generation":
+            st.subheader("💡 Hypothesis Generation")
+            observation_or_question = st.text_area("Describe an observation, a business question, or a problem you want to investigate:", height=100, key="ai_hypothesis_input")
+            if st.button("Generate Hypotheses", type="primary"):
+                if observation_or_question:
+                    prompt = f"""You are an expert data scientist and critical thinker.
+Given the following data context (DataFrame schema and sample) and an observation/question:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Observation/Question:
+{observation_or_question}
+
+Generate several testable hypotheses that can be investigated using the provided data.
+For each hypothesis, suggest how it could be tested (e.g., statistical test, visualization, model building).
+Use markdown for formatting.
+"""
+                    hypotheses = generate_gemini_content(prompt)
+                    if hypotheses:
+                        st.markdown(hypotheses)
+                else:
+                    st.warning("Please provide an observation or question.")
+
+        elif selected_ai_task == "🧹 Data Quality Improvement Plan":
+            st.subheader("🧹 Data Quality Improvement Plan")
+            dq_issues_input = st.text_area("Describe the data quality issues you've identified (e.g., 'missing values in age column', 'inconsistent city names', 'duplicate records'):", height=150, key="ai_dq_issues_input")
+            if st.button("Generate Improvement Plan", type="primary"):
+                if dq_issues_input:
+                    prompt = f"""You are an expert in data governance and data quality management.
+Given the following data context (DataFrame schema and sample) and identified data quality issues:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Identified Data Quality Issues:
+{dq_issues_input}
+
+Propose a comprehensive plan for improving the data quality.
+Include steps for data profiling, cleaning, validation, and ongoing monitoring.
+Suggest best practices and tools where applicable. Use markdown for formatting.
+"""
+                    dq_plan = generate_gemini_content(prompt)
+                    if dq_plan:
+                        st.markdown(dq_plan)
+                else:
+                    st.warning("Please describe the data quality issues.")
+
+        elif selected_ai_task == "⚖️ Ethical AI Considerations":
+            st.subheader("⚖️ Ethical AI Considerations")
+            ai_app_description = st.text_area("Describe the AI application or model you are developing/using (e.g., 'a loan approval system', 'a hiring recommendation tool', 'a medical diagnosis assistant'):", height=100, key="ai_ethical_app_desc")
+            if st.button("Outline Ethical Considerations", type="primary"):
+                if ai_app_description:
+                    prompt = f"""You are an expert in AI ethics and responsible AI development.
+Given the following data context (DataFrame schema and sample) and AI application description:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+AI Application Description:
+{ai_app_description}
+
+Outline the key ethical considerations for this AI application.
+Focus on potential issues related to bias, fairness, transparency, accountability, and privacy.
+Suggest ways to mitigate these risks. Use markdown for formatting.
+"""
+                    ethical_considerations = generate_gemini_content(prompt)
+                    if ethical_considerations:
+                        st.markdown(ethical_considerations)
+                else:
+                    st.warning("Please describe the AI application.")
+
+        elif selected_ai_task == "🔒 Data Privacy Recommendations":
+            st.subheader("🔒 Data Privacy Recommendations")
+            data_types_handled = st.text_area("Describe the types of data being handled (e.g., 'customer personal information', 'health records', 'financial transactions', 'anonymized user behavior'):", height=100, key="ai_privacy_data_types")
+            if st.button("Generate Privacy Recommendations", type="primary"):
+                if data_types_handled:
+                    prompt = f"""You are an expert in data privacy and security regulations (e.g., GDPR, CCPA).
+Given the following data context (DataFrame schema and sample) and types of data being handled:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Types of Data Being Handled:
+{data_types_handled}
+
+Provide comprehensive recommendations for ensuring data privacy and security.
+Include considerations for data collection, storage, processing, sharing, and retention.
+Mention relevant privacy principles and techniques (e.g., anonymization, pseudonymization, encryption).
+Use markdown for formatting.
+"""
+                    privacy_recs = generate_gemini_content(prompt)
+                    if privacy_recs:
+                        st.markdown(privacy_recs)
+                else:
+                    st.warning("Please describe the types of data being handled.")
+
+        elif selected_ai_task == "📄 Automated Report Generation (Draft)":
+            st.subheader("📄 Automated Report Generation (Draft)")
+            report_purpose = st.text_area("Describe the purpose of the report (e.g., 'monthly sales performance', 'customer churn analysis', 'project status update'):", height=80, key="ai_report_purpose")
+            key_metrics_report = st.multiselect("Select key columns/metrics to include in the report:", df.columns.tolist(), key="ai_report_metrics")
+            additional_sections = st.text_area("Any additional sections or specific points to include (e.g., 'executive summary', 'recommendations', 'future outlook'):", height=80, key="ai_report_sections")
+            if st.button("Draft Report Sections", type="primary"):
+                if report_purpose and key_metrics_report:
+                    prompt = f"""You are an expert business analyst and report writer.
+Given the following data context (DataFrame schema and sample) and report requirements:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Report Purpose: {report_purpose}
+Key Metrics/Columns to Include: {', '.join(key_metrics_report)}
+Additional Sections: {additional_sections if additional_sections else 'None'}
+
+Draft the main sections of an automated report.
+For each section, provide a placeholder for content and suggest what kind of data-driven insights or visualizations should be included.
+Sections might include: Executive Summary, Key Findings, Detailed Analysis (for each metric), Recommendations, Conclusion.
+Use markdown for formatting.
+"""
+                    report_draft = generate_gemini_content(prompt)
+                    if report_draft:
+                        st.markdown(report_draft)
+                else:
+                    st.warning("Please describe the report purpose and select key metrics.")
+
+        elif selected_ai_task == "💬 Sentiment Analysis (Conceptual)":
+            st.subheader("💬 Sentiment Analysis (Conceptual)")
+            text_cols_sentiment = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            if not text_cols_sentiment:
+                st.info("No text columns found for sentiment analysis.")
+            else:
+                sentiment_col = st.selectbox("Select text column for sentiment analysis:", text_cols_sentiment, key="ai_sentiment_col")
+                if st.button("Perform Conceptual Sentiment Analysis", type="primary"):
+                    if sentiment_col:
+                        prompt = f"""You are an expert in natural language processing and sentiment analysis.
+Given the following data context (DataFrame schema and sample) and a text column:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Text Column for Analysis: '{sentiment_col}'
+
+Conceptually perform sentiment analysis on the text in this column.
+Describe the overall sentiment (e.g., positive, negative, neutral) and identify any common themes or keywords associated with different sentiments.
+Suggest how this analysis could be used. Use markdown for formatting.
+"""
+                        sentiment_report = generate_gemini_content(prompt)
+                        if sentiment_report:
+                            st.markdown(sentiment_report)
+                    else:
+                        st.warning("Please select a text column.")
+
+        elif selected_ai_task == "🏷️ Topic Modeling (Conceptual)":
+            st.subheader("🏷️ Topic Modeling (Conceptual)")
+            text_cols_topic = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            if not text_cols_topic:
+                st.info("No text columns found for topic modeling.")
+            else:
+                topic_col = st.selectbox("Select text column for topic modeling:", text_cols_topic, key="ai_topic_col")
+                if st.button("Perform Conceptual Topic Modeling", type="primary"):
+                    if topic_col:
+                        prompt = f"""You are an expert in natural language processing and topic modeling.
+Given the following data context (DataFrame schema and sample) and a text column:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Text Column for Analysis: '{topic_col}'
+
+Conceptually perform topic modeling on the text in this column.
+Identify and describe 3-5 potential topics that might emerge from this text data.
+For each topic, list keywords that would likely define it.
+Suggest how this analysis could be used. Use markdown for formatting.
+"""
+                        topic_report = generate_gemini_content(prompt)
+                        if topic_report:
+                            st.markdown(topic_report)
+                    else:
+                        st.warning("Please select a text column.")
+
+        elif selected_ai_task == "👥 Customer Segmentation Insights":
+            st.subheader("👥 Customer Segmentation Insights")
+            customer_cols = st.multiselect("Select columns relevant to customer behavior or demographics (e.g., 'age', 'income', 'purchase_history', 'city'):", df.columns.tolist(), key="ai_customer_cols")
+            if st.button("Generate Segmentation Insights", type="primary"):
+                if customer_cols:
+                    prompt = f"""You are an expert in customer analytics and market segmentation.
+Given the following data context (DataFrame schema and sample) and relevant customer columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Relevant Customer Columns: {', '.join(customer_cols)}
+
+Suggest potential customer segments that could exist within this dataset.
+For each segment, describe its likely characteristics and provide insights into how a business could target or serve them.
+Suggest methods (e.g., clustering, RFM analysis) to identify these segments.
+Use markdown for formatting.
+"""
+                    segmentation_insights = generate_gemini_content(prompt)
+                    if segmentation_insights:
+                        st.markdown(segmentation_insights)
+                else:
+                    st.warning("Please select relevant customer columns.")
+
+        elif selected_ai_task == "📈 Market Trend Analysis":
+            st.subheader("📈 Market Trend Analysis")
+            time_cols_trend = df.select_dtypes(include=['datetime64']).columns.tolist()
+            numeric_cols_trend = df.select_dtypes(include=np.number).columns.tolist()
+            if not time_cols_trend or not numeric_cols_trend:
+                st.info("Requires both datetime and numeric columns for market trend analysis.")
+            else:
+                time_col_trend = st.selectbox("Select time column:", time_cols_trend, key="ai_trend_time_col")
+                value_col_trend = st.selectbox("Select numeric value column (e.g., 'sales', 'price', 'volume'):", numeric_cols_trend, key="ai_trend_value_col")
+                if st.button("Analyze Market Trends", type="primary"):
+                    if time_col_trend and value_col_trend:
+                        prompt = f"""You are an expert in market analysis and time series data.
+Given the following data context (DataFrame schema and sample) with a time column and a value column:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Time Column: '{time_col_trend}'
+Value Column: '{value_col_trend}'
+
+Analyze the potential market trends in this data.
+Identify and describe any observed trends (e.g., upward, downward, cyclical, seasonal).
+Discuss potential factors influencing these trends and their business implications.
+Suggest methods (e.g., moving averages, decomposition) to analyze these trends.
+Use markdown for formatting.
+"""
+                        trend_analysis = generate_gemini_content(prompt)
+                        if trend_analysis:
+                            st.markdown(trend_analysis)
+                    else:
+                        st.warning("Please select both a time column and a value column.")
+
+        elif selected_ai_task == "⚠️ Risk Assessment Insights":
+            st.subheader("⚠️ Risk Assessment Insights")
+            scenario_description = st.text_area("Describe the business scenario or area you want to assess for risks (e.g., 'launching a new product', 'expanding into a new market', 'managing customer churn'):", height=100, key="ai_risk_scenario")
+            relevant_cols_risk = st.multiselect("Select columns that might be relevant to assessing risks:", df.columns.tolist(), key="ai_risk_cols")
+            if st.button("Assess Risks", type="primary"):
+                if scenario_description and relevant_cols_risk:
+                    prompt = f"""You are an expert in business risk management and data analysis.
+Given the following data context (DataFrame schema and sample), a business scenario, and relevant columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Business Scenario:
+{scenario_description}
+
+Relevant Columns: {', '.join(relevant_cols_risk)}
+
+Identify potential risks associated with this scenario, leveraging insights from the provided data context.
+For each risk, describe its potential impact and likelihood, and suggest mitigation strategies.
+Use markdown for formatting.
+"""
+                    risk_insights = generate_gemini_content(prompt)
+                    if risk_insights:
+                        st.markdown(risk_insights)
+                else:
+                    st.warning("Please describe the scenario and select relevant columns.")
+
+        elif selected_ai_task == "📦 Supply Chain Optimization Suggestions":
+            st.subheader("📦 Supply Chain Optimization Suggestions")
+            supply_chain_problem = st.text_area("Describe a specific supply chain problem or goal (e.g., 'reduce inventory costs', 'improve delivery times', 'optimize warehouse operations'):", height=100, key="ai_sc_problem")
+            relevant_cols_sc = st.multiselect("Select columns relevant to supply chain (e.g., 'inventory_level', 'delivery_date', 'order_quantity', 'supplier_id'):", df.columns.tolist(), key="ai_sc_cols")
+            if st.button("Suggest Optimization Strategies", type="primary"):
+                if supply_chain_problem and relevant_cols_sc:
+                    prompt = f"""You are an expert in supply chain management and optimization.
+Given the following data context (DataFrame schema and sample), a supply chain problem/goal, and relevant columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Supply Chain Problem/Goal:
+{supply_chain_problem}
+
+Relevant Columns: {', '.join(relevant_cols_sc)}
+
+Suggest data-driven strategies and approaches to optimize the supply chain for the described problem/goal.
+Focus on how the provided data could be used to achieve these optimizations.
+Use markdown for formatting.
+"""
+                    sc_suggestions = generate_gemini_content(prompt)
+                    if sc_suggestions:
+                        st.markdown(sc_suggestions)
+                else:
+                    st.warning("Please describe the supply chain problem and select relevant columns.")
+
+        elif selected_ai_task == "🛒 Personalized Recommendation Engine (Conceptual)":
+            st.subheader("🛒 Personalized Recommendation Engine (Conceptual)")
+            user_id_col = st.selectbox("Select User ID column:", ['None'] + df.columns.tolist(), key="ai_rec_user_id")
+            item_id_col = st.selectbox("Select Item ID column:", ['None'] + df.columns.tolist(), key="ai_rec_item_id")
+            interaction_col = st.selectbox("Select Interaction column (e.g., 'rating', 'purchase_count', 'view_duration'):", ['None'] + df.columns.tolist(), key="ai_rec_interaction")
+            if st.button("Explain Recommendation Engine", type="primary"):
+                if user_id_col != 'None' and item_id_col != 'None' and interaction_col != 'None':
+                    prompt = f"""You are an expert in building personalized recommendation systems.
+Given the following data context (DataFrame schema and sample) with user, item, and interaction columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+User ID Column: '{user_id_col}'
+Item ID Column: '{item_id_col}'
+Interaction Column: '{interaction_col}'
+
+Explain conceptually how a personalized recommendation engine could be built using this data.
+Describe different types of recommendation approaches (e.g., collaborative filtering, content-based) and what kind of insights they could provide.
+Suggest how these recommendations could benefit a business.
+Use markdown for formatting.
+"""
+                    rec_engine_explanation = generate_gemini_content(prompt)
+                    if rec_engine_explanation:
+                        st.markdown(rec_engine_explanation)
+                else:
+                    st.warning("Please select User ID, Item ID, and Interaction columns.")
+
+        elif selected_ai_task == "🧪 A/B Testing Interpretation":
+            st.subheader("🧪 A/B Testing Interpretation")
+            ab_test_results = st.text_area("Paste your A/B test results here (e.g., 'Control Group Conversion Rate: 10%, Variant Group Conversion Rate: 12%, P-value: 0.03, Sample Size: 1000 per group'):", height=150, key="ai_ab_test_results")
+            if st.button("Interpret A/B Test Results", type="primary"):
+                if ab_test_results:
+                    prompt = f"""You are an expert in A/B testing and statistical inference.
+Given the following A/B test results:
+
+{ab_test_results}
+
+Interpret these results in plain language.
+State whether the variant had a statistically significant impact.
+Explain the practical implications for the business and suggest clear next steps (e.g., 'launch the variant', 'run more tests', 'investigate further').
+Use markdown for formatting.
+"""
+                    ab_interpretation = generate_gemini_content(prompt)
+                    if ab_interpretation:
+                        st.markdown(ab_interpretation)
+                else:
+                    st.warning("Please paste your A/B test results.")
+
+        elif selected_ai_task == "🎲 Simulation Scenario Generation":
+            st.subheader("🎲 Simulation Scenario Generation")
+            process_model_desc = st.text_area("Describe the business process or model you want to simulate (e.g., 'customer journey through our website', 'manufacturing production line', 'call center operations'):", height=100, key="ai_sim_process_desc")
+            key_variables_sim = st.multiselect("Select key variables or parameters for the simulation:", df.columns.tolist(), key="ai_sim_vars")
+            if st.button("Generate Simulation Scenarios", type="primary"):
+                if process_model_desc and key_variables_sim:
+                    prompt = f"""You are an expert in business process modeling and simulation.
+Given the following data context (DataFrame schema and sample), a business process/model, and key variables:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Business Process/Model:
+{process_model_desc}
+
+Key Variables/Parameters: {', '.join(key_variables_sim)}
+
+Generate several distinct simulation scenarios (e.g., 'best case', 'worst case', 'most likely', 'stress test').
+For each scenario, describe the assumptions about the key variables and the expected outcomes.
+Suggest how these scenarios could be used for decision-making.
+Use markdown for formatting.
+"""
+                    sim_scenarios = generate_gemini_content(prompt)
+                    if sim_scenarios:
+                        st.markdown(sim_scenarios)
+                else:
+                    st.warning("Please describe the process and select key variables.")
+
+        elif selected_ai_task == "⚔️ Competitive Analysis Insights":
+            st.subheader("⚔️ Competitive Analysis Insights")
+            competitor_data_input = st.text_area("Provide information about a competitor or the competitive landscape (e.g., 'Competitor X has lower prices but slower delivery', 'Market is saturated with similar products', 'Our product has feature A, Competitor B has feature B'):", height=150, key="ai_comp_data_input")
+            if st.button("Generate Competitive Insights", type="primary"):
+                if competitor_data_input:
+                    prompt = f"""You are an expert in market strategy and competitive analysis.
+Given the following data context (DataFrame schema and sample) and competitor information:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Competitor Information:
+{competitor_data_input}
+
+Generate insights into the competitive landscape.
+Identify potential competitive advantages or disadvantages for your business.
+Suggest strategic moves or areas for improvement based on this analysis.
+Use frameworks like SWOT or Porter's Five Forces conceptually if applicable.
+Use markdown for formatting.
+"""
+                    comp_insights = generate_gemini_content(prompt)
+                    if comp_insights:
+                        st.markdown(comp_insights)
+                else:
+                    st.warning("Please provide competitor information.")
+
+        elif selected_ai_task == "💰 Resource Allocation Optimization":
+            st.subheader("💰 Resource Allocation Optimization")
+            resources_desc = st.text_area("Describe the resources to be allocated (e.g., 'marketing budget', 'sales team headcount', 'production capacity'):", height=80, key="ai_res_desc")
+            objectives_desc = st.text_area("Describe the objectives to optimize for (e.g., 'maximize profit', 'minimize cost', 'increase customer satisfaction'):", height=80, key="ai_obj_desc")
+            relevant_cols_res = st.multiselect("Select columns relevant to resources and objectives (e.g., 'cost', 'revenue', 'customer_satisfaction_score', 'employee_performance'):", df.columns.tolist(), key="ai_res_cols")
+            if st.button("Suggest Allocation Strategies", type="primary"):
+                if resources_desc and objectives_desc and relevant_cols_res:
+                    prompt = f"""You are an expert in operations research and resource allocation.
+Given the following data context (DataFrame schema and sample), resources, objectives, and relevant columns:
+
+DataFrame Schema:
+{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
+
+Sample Data:
+{df.head().to_string()}
+
+Resources to be Allocated: {resources_desc}
+Objectives to Optimize For: {objectives_desc}
+Relevant Columns: {', '.join(relevant_cols_res)}
+
+Suggest data-driven strategies for optimal resource allocation.
+Explain how the provided data could inform these decisions and what kind of analysis (e.g., linear programming, simulation) might be needed.
+Use markdown for formatting.
+"""
+                    res_alloc_strategies = generate_gemini_content(prompt)
+                    if res_alloc_strategies:
+                        st.markdown(res_alloc_strategies)
+                else:
+                    st.warning("Please describe resources, objectives, and select relevant columns.")
+
 elif selected_tool == "🐍 Python Advanced Analytics":
     st.markdown('<h2 class="tool-header">🐍 Python Advanced Analytics</h2>', unsafe_allow_html=True)
 
@@ -5205,7 +5788,7 @@ else:
             st.warning("Enter your Google AI API Key in the sidebar to enable the AI Assistant.")
         else: # Line 5003
             ai_python_task = st.selectbox("Select AI Task", [
-                "Explain Code",
+            "Explain Code", # Python-specific explanation
                 "Generate Code from Natural Language", # Re-adding this one
                 "Perform Code Review", # New AI Feature
                 "Refactor Python Code",
@@ -5220,7 +5803,6 @@ else:
                 "Explain Data Relationships",
                 "Recommend ML Model",
                 "Generate Feature Engineering Code",
-                "Explain Model Predictions",
                 "Suggest Hyperparameters",
                 "Evaluate Model Performance",
                 "Generate Executive Summary",
@@ -5263,926 +5845,6 @@ Your code MUST:
                             st.success("AI-generated Python code populated in the editor!")
                             st.rerun()
                     else:
-                        st.warning("Please enter a description for the AI to generate code.")
-
-            elif ai_python_task == "Explain Code":
-                code_to_explain = st.text_area("Paste Python code to explain:", height=200, key="ai_python_explain_code")
-                if st.button("🧠 Explain Python Code"):
-                    if code_to_explain:
-                        prompt = f"You are an expert Python developer and teacher. Explain the following Python code step-by-step. Describe what the code does, its purpose, and how it works.\nUse markdown for formatting.\n\nCode:\n```python\n{code_to_explain}\n```"
-                        explanation = generate_gemini_content(prompt)
-                        if explanation:
-                            st.subheader("🦄 AI Code Explanation")
-                            st.markdown(explanation)
-                    else:
-                        st.warning("Please paste some code to explain.")
-
-            elif ai_python_task == "Refactor Python Code":
-                st.subheader("💡 Refactor Python Code")
-                code_to_refactor = st.text_area("Paste Python code to refactor:", height=200, key="ai_python_refactor_code")
-                if st.button("✨ Get Refactored Code"):
-                    if code_to_refactor:
-                        prompt = f"You are an expert Python developer. Refactor the following code for better readability, maintainability, and Pythonic style. Provide only the refactored code in a single code block, followed by a brief explanation of the changes.\n\nCode:\n```python\n{code_to_refactor}\n```"
-                        refactored_code = generate_gemini_content(prompt)
-                        if refactored_code:
-                            st.markdown(refactored_code)
-                    else:
-                        st.warning("Please paste some code to refactor.")
-
-            elif ai_python_task == "Perform Code Review":
-                st.subheader("🧐 Perform Code Review")
-                code_to_review = st.text_area("Paste Python code to review:", height=200, key="ai_python_review_code")
-                if st.button("🔍 Get Code Review"):
-                    if code_to_review:
-                        prompt = f"""You are an expert Python software engineer and code reviewer.
-Review the following Python code for:
-- Readability and clarity
-- Efficiency and performance
-- Adherence to best practices (PEP 8, idiomatic Python)
-- Potential bugs or edge cases
-- Maintainability and extensibility
-
-Provide constructive feedback and suggestions for improvement.
-Use markdown for formatting, including code examples for suggested changes.
-
-Code:\n```python\n{code_to_review}\n```"""
-                        review_feedback = generate_gemini_content(prompt)
-                        if review_feedback:
-                            st.markdown(review_feedback)
-                    else:
-                        st.warning("Please paste some code to review.")
-
-            elif ai_python_task == "Generate Unit Tests":
-                st.subheader("🧪 Generate Unit Tests")
-                code_for_tests = st.text_area("Paste Python function(s) to generate unit tests for:", height=200, key="ai_python_unit_test_code")
-                if st.button("✨ Generate Tests"):
-                    if code_for_tests:
-                        prompt = f"You are an expert Python developer specializing in unit testing. Generate simple unit tests for the following Python code (function(s)) using the `unittest` module. Focus on basic functionality and edge cases. Provide only the Python code in a single code block.\n\nCode:\n```python\n{code_for_tests}\n```"
-                        unit_tests = generate_gemini_content(prompt)
-                        if unit_tests:
-                            st.code(unit_tests, language='python')
-                    else:
-                        st.warning("Please paste some code to generate tests for.")
-
-            elif ai_python_task == "Optimize Python Code":
-                st.subheader("⚡ Optimize Python Code")
-                code_to_optimize = st.text_area("Paste Python code to optimize:", height=200, key="ai_python_optimize_code")
-                if st.button("🚀 Get Optimized Code"):
-                    if code_to_optimize:
-                        prompt = f"You are an expert Python performance engineer. Optimize the following code for speed and efficiency. Provide only the optimized code in a single code block, followed by a brief explanation of the optimizations.\n\nCode:\n```python\n{code_to_optimize}\n```"
-                        optimized_code = generate_gemini_content(prompt)
-                        if optimized_code:
-                            st.markdown(optimized_code)
-                    else:
-                        st.warning("Please paste some code to optimize.")
-
-            elif ai_python_task == "Debug Python Code":
-                st.subheader("🐛 Debug Python Code")
-                code_to_debug = st.text_area("Paste Python code to debug:", height=200, key="ai_python_debug_code")
-                error_message = st.text_area("Paste any error message (optional):", height=100, key="ai_python_debug_error")
-                if st.button("🔍 Get Debugging Help"):
-                    if code_to_debug:
-                        prompt = f"You are an expert Python debugger. Analyze the following code and provide debugging suggestions. If an error message is provided, explain the error and suggest a fix.\n\nCode:\n```python\n{code_to_debug}\n```\nError Message:\n```\n{error_message}\n```"
-                        debug_help = generate_gemini_content(prompt)
-                        if debug_help:
-                            st.markdown(debug_help)
-                    else:
-                        st.warning("Please paste some code to debug.")
-
-            elif ai_python_task == "Automated Data Profiling":
-                st.subheader("📊 Automated Data Profiling")
-                if st.button("Generate Data Profile"):
-                    if df.empty:
-                        st.warning("DataFrame is empty. Please upload data.")
-                        profile = None
-                    else:
-                        prompt = f"You are an expert data analyst. Generate a comprehensive data profile for the following pandas DataFrame schema and sample data. Focus on data types, missing values, unique values, basic statistics, and potential issues. Provide the output in markdown format.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
-                    profile = generate_gemini_content(prompt)
-                    if profile:
-                        st.markdown(profile)
-
-            elif ai_python_task == "Predict Missing Values":
-                st.subheader("🔮 Predict Missing Values")
-                missing_value_cols = [col for col in df.columns if df[col].isnull().any()]
-                if not missing_value_cols:
-                    st.info("No columns with missing values found in the DataFrame.")
-                else:
-                    missing_value_col = st.selectbox("Select column with missing values to analyze:", missing_value_cols, key="ai_predict_missing_col")
-                    if st.button("Get Missing Value Prediction Suggestions"):
-                        prompt = f"""You are an expert data scientist. Given a pandas DataFrame `df` with the following schema:
-Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
-
-The column '{missing_value_col}' has missing values. Suggest methods to predict or impute these missing values.
-Provide Python code for a simple imputation method (e.g., mean, median, mode) and suggest an advanced ML-based method (e.g., KNNImputer, IterativeImputer) with conceptual code.
-Explain the pros and cons of each suggested method for this specific column.
-"""
-                        prediction_suggestions = generate_gemini_content(prompt)
-                        if prediction_suggestions:
-                            st.markdown(prediction_suggestions)
-
-            elif ai_python_task == "Identify Data Anomalies":
-                st.subheader("🚨 Identify Data Anomalies")
-                numeric_cols_anomaly = df.select_dtypes(include=np.number).columns.tolist()
-                if not numeric_cols_anomaly:
-                    st.info("No numeric columns found for anomaly detection.")
-                else:
-                    anomaly_col = st.selectbox("Select numeric column to check for anomalies:", numeric_cols_anomaly, key="ai_anomaly_col")
-                    if st.button("Identify Anomalies"):
-                        prompt = f"""You are an expert data analyst specializing in anomaly detection. Given a pandas DataFrame `df` with the following schema:
-Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
-
-Identify potential data anomalies/outliers in the column '{anomaly_col}'.
-Explain the method you would use (e.g., IQR, Z-score, Isolation Forest) and list the indices of anomalous rows if any are found in the sample data.
-Provide Python code to identify these anomalies.
-"""
-                        anomaly_report = generate_gemini_content(prompt)
-                        if anomaly_report:
-                            st.markdown(anomaly_report)
-
-            elif ai_python_task == "Suggest Data Cleaning Steps":
-                st.subheader("🧹 Suggest Data Cleaning Steps")
-                if st.button("Get Cleaning Suggestions"):
-                    if df.empty:
-                        st.warning("DataFrame is empty. Please upload data.")
-                        cleaning_suggestions = None
-                    else:
-                        prompt = f"You are an expert in data cleaning. Based on the following DataFrame schema and sample data, suggest specific data cleaning steps (e.g., handling missing values, correcting data types, removing duplicates, addressing outliers). Provide the rationale and example pandas code for each.\n\nSchema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}"
-                    cleaning_suggestions = generate_gemini_content(prompt)
-                    if cleaning_suggestions:
-                        st.markdown(cleaning_suggestions)
-
-            elif ai_python_task == "Interpret Statistical Results":
-                st.subheader("📊 Interpret Statistical Results")
-                stat_results_input = st.text_area("Paste statistical output (e.g., t-test, ANOVA, regression summary) here:", height=200, key="ai_stat_results_input")
-                if st.button("Interpret Results"):
-                    if stat_results_input:
-                        prompt = f"""You are an expert statistician and data analyst. Interpret the following statistical results in plain language.
-Explain what the results mean, their significance, and any implications for the data or problem being studied.
-
-Statistical Results:\n```\n{stat_results_input}\n```
-"""
-                        interpretation = generate_gemini_content(prompt)
-                        if interpretation:
-                            st.markdown(interpretation)
-                    else:
-                        st.warning("Please paste statistical results to interpret.")
-
-            elif ai_python_task == "Explain Data Relationships":
-                st.subheader("🔗 Explain Data Relationships")
-                if df.empty:
-                    st.warning("DataFrame is empty. Please upload data.")
-                else:
-                    cols_for_relationship = st.multiselect("Select columns to explain relationships:", df.columns.tolist(), default=df.columns.tolist()[:2], key="ai_relationship_cols")
-                    if st.button("Explain Relationships"):
-                        if len(cols_for_relationship) < 2:
-                            st.warning("Please select at least two columns to explain relationships.")
-                        else:
-                            prompt = f"""You are an expert data analyst. Given a pandas DataFrame `df` with the following schema:
-Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
-
-Explain the relationship between the following columns: {', '.join(cols_for_relationship)}.
-Discuss potential correlations, dependencies, and any observed patterns.
-Provide Python code to visualize their relationship (e.g., scatter plot, pair plot, or bar chart depending on data types).
-"""
-                            relationship_explanation = generate_gemini_content(prompt)
-                            if relationship_explanation:
-                                st.markdown(relationship_explanation)
-
-            elif ai_python_task == "Recommend ML Model":
-                st.subheader("🦄 Recommend ML Model")
-                if df.empty:
-                    st.warning("DataFrame is empty. Please upload data.")
-                else:
-                    target_col_ml = st.selectbox("Select target column:", df.columns.tolist(), key="ai_ml_target_col")
-                    ml_task = st.radio("Select ML Task:", ["Classification", "Regression"], key="ai_ml_task")
-                    if st.button("Recommend ML Model"):
-                        prompt = f"""You are an expert machine learning engineer. Given a pandas DataFrame `df` with the following schema:
-Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
-
-The task is to predict the column '{target_col_ml}', which is a {ml_task} problem.
-Recommend suitable machine learning models for this task. For each recommended model:
-1. Explain why it is suitable for this type of data and task.
-2. Provide conceptual Python code for training the model (assuming `X_train`, `y_train` are available).
-"""
-                        model_recommendation = generate_gemini_content(prompt)
-                        if model_recommendation:
-                            st.markdown(model_recommendation)
-
-            elif ai_python_task == "Generate Feature Engineering Code":
-                st.subheader("🛠️ Generate Feature Engineering Code")
-                fe_request = st.text_area("Describe the feature you want to engineer (e.g., 'create a new column for age groups', 'combine first and last name'):", height=100, key="ai_python_fe_request")
-                if st.button("✨ Generate FE Code"):
-                    if fe_request:
-                        prompt = f"You are an expert in feature engineering using pandas. Given a DataFrame `df` with schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nWrite Python code to perform the following feature engineering task:\n'{fe_request}'\n\nProvide only the Python code in a single code block, without explanation. Assume `df` is available."
-                        fe_code = generate_gemini_content(prompt) 
-                        if fe_code:
-                            st.code(fe_code, language='python')
-                    else:
-                        st.warning("Please describe the feature engineering task.")
-
-            elif ai_python_task == "📖 Data Storytelling/Narrative Generation":
-                st.subheader("📖 Data Storytelling/Narrative Generation")
-                story_input = st.text_area("Provide key findings, insights, or data points you want to weave into a story:", height=150, key="ai_story_input")
-                if st.button("Generate Data Story", type="primary"):
-                    if story_input:
-                        prompt = f"""You are an expert data storyteller and business communicator.
-Given the following data context (DataFrame schema and sample) and key findings/insights:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Key Findings/Insights:
-{story_input}
-
-Weave these findings into a compelling and insightful data story or narrative.
-Focus on the 'so what?' and the implications for a business audience.
-Use clear, engaging language and markdown for formatting.
-"""
-                        story = generate_gemini_content(prompt)
-                        if story:
-                            st.markdown(story)
-                    else:
-                        st.warning("Please provide some key findings or insights to generate a story.")
-
-            elif ai_python_task == "🚨 Anomaly Detection Explanation":
-                st.subheader("🚨 Anomaly Detection Explanation")
-                numeric_cols_anomaly_exp = df.select_dtypes(include=np.number).columns.tolist()
-                if not numeric_cols_anomaly_exp:
-                    st.info("No numeric columns found for anomaly explanation.")
-                else:
-                    anomaly_col_exp = st.selectbox("Select column where anomalies were detected:", numeric_cols_anomaly_exp, key="ai_anomaly_col_exp")
-                    anomalous_values_input = st.text_area("List specific anomalous values or their characteristics (e.g., 'values above 1000', 'outliers at indices 5, 12, 20'):", height=100, key="ai_anomalous_values_input")
-                    if st.button("Explain Anomalies", type="primary"):
-                        if anomaly_col_exp and anomalous_values_input:
-                            prompt = f"""You are an expert data analyst specializing in anomaly detection.
-Given the following data context (DataFrame schema and sample) and detected anomalies:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Anomalies detected in column '{anomaly_col_exp}':
-{anomalous_values_input}
-
-Explain the potential meaning, implications, and possible causes of these anomalies.
-Suggest further investigation steps. Use markdown for formatting.
-"""
-                            explanation = generate_gemini_content(prompt)
-                            if explanation:
-                                st.markdown(explanation)
-                        else:
-                            st.warning("Please select a column and describe the anomalies.")
-
-            elif ai_python_task == "🔍 Root Cause Analysis (Conceptual)":
-                st.subheader("🔍 Root Cause Analysis (Conceptual)")
-                problem_description = st.text_area("Describe the problem or observed symptom:", height=100, key="ai_rca_problem")
-                relevant_cols_rca = st.multiselect("Select relevant columns that might be related to the problem:", df.columns.tolist(), key="ai_rca_cols")
-                if st.button("Suggest Root Causes", type="primary"):
-                    if problem_description and relevant_cols_rca:
-                        prompt = f"""You are an expert in root cause analysis for business and data problems.
-Given the following data context (DataFrame schema and sample), an observed problem, and relevant columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Observed Problem:
-{problem_description}
-
-Relevant Columns: {', '.join(relevant_cols_rca)}
-
-Suggest potential root causes for this problem based on the provided context.
-For each potential cause, explain how it might be related to the problem and suggest data-driven ways to investigate it further.
-Use markdown for formatting.
-"""
-                        root_causes = generate_gemini_content(prompt)
-                        if root_causes:
-                            st.markdown(root_causes)
-                    else:
-                        st.warning("Please describe the problem and select relevant columns.")
-
-            elif ai_python_task == "🔮 Predictive Modeling Insights":
-                st.subheader("🔮 Predictive Modeling Insights")
-                target_col_pred_insight = st.selectbox("Select the target column for prediction:", df.columns.tolist(), key="ai_pred_insight_target")
-                model_type_pred_insight = st.text_input("What type of model are you considering (e.g., Regression, Classification, Time Series)?", key="ai_pred_insight_model_type")
-                if st.button("Get Predictive Insights", type="primary"):
-                    if target_col_pred_insight and model_type_pred_insight:
-                        prompt = f"""You are an expert in predictive modeling and data science.
-Given the following data context (DataFrame schema and sample):
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-The goal is to predict the column '{target_col_pred_insight}' using a '{model_type_pred_insight}' model.
-
-Provide insights into:
-1.  What kind of predictions can be made (e.g., continuous values, categories, future trends)?
-2.  Which features are likely to be strong predictors and why?
-3.  Potential challenges or considerations for building this predictive model.
-4.  How the predictions could be used in a real-world scenario.
-Use markdown for formatting.
-"""
-                        insights = generate_gemini_content(prompt)
-                        if insights:
-                            st.markdown(insights)
-                    else:
-                        st.warning("Please select a target column and specify the model type.")
-
-            elif ai_python_task == "💡 Hypothesis Generation":
-                st.subheader("💡 Hypothesis Generation")
-                observation_or_question = st.text_area("Describe an observation, a business question, or a problem you want to investigate:", height=100, key="ai_hypothesis_input")
-                if st.button("Generate Hypotheses", type="primary"):
-                    if observation_or_question:
-                        prompt = f"""You are an expert data scientist and critical thinker.
-Given the following data context (DataFrame schema and sample) and an observation/question:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Observation/Question:
-{observation_or_question}
-
-Generate several testable hypotheses that can be investigated using the provided data.
-For each hypothesis, suggest how it could be tested (e.g., statistical test, visualization, model building).
-Use markdown for formatting.
-"""
-                        hypotheses = generate_gemini_content(prompt)
-                        if hypotheses:
-                            st.markdown(hypotheses)
-                    else:
-                        st.warning("Please provide an observation or question.")
-
-            elif ai_python_task == "🧹 Data Quality Improvement Plan":
-                st.subheader("🧹 Data Quality Improvement Plan")
-                dq_issues_input = st.text_area("Describe the data quality issues you've identified (e.g., 'missing values in age column', 'inconsistent city names', 'duplicate records'):", height=150, key="ai_dq_issues_input")
-                if st.button("Generate Improvement Plan", type="primary"):
-                    if dq_issues_input:
-                        prompt = f"""You are an expert in data governance and data quality management.
-Given the following data context (DataFrame schema and sample) and identified data quality issues:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Identified Data Quality Issues:
-{dq_issues_input}
-
-Propose a comprehensive plan for improving the data quality.
-Include steps for data profiling, cleaning, validation, and ongoing monitoring.
-Suggest best practices and tools where applicable. Use markdown for formatting.
-"""
-                        dq_plan = generate_gemini_content(prompt)
-                        if dq_plan:
-                            st.markdown(dq_plan)
-                    else:
-                        st.warning("Please describe the data quality issues.")
-
-            elif ai_python_task == "⚖️ Ethical AI Considerations":
-                st.subheader("⚖️ Ethical AI Considerations")
-                ai_app_description = st.text_area("Describe the AI application or model you are developing/using (e.g., 'a loan approval system', 'a hiring recommendation tool', 'a medical diagnosis assistant'):", height=100, key="ai_ethical_app_desc")
-                if st.button("Outline Ethical Considerations", type="primary"):
-                    if ai_app_description:
-                        prompt = f"""You are an expert in AI ethics and responsible AI development.
-Given the following data context (DataFrame schema and sample) and AI application description:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-AI Application Description:
-{ai_app_description}
-
-Outline the key ethical considerations for this AI application.
-Focus on potential issues related to bias, fairness, transparency, accountability, and privacy.
-Suggest ways to mitigate these risks. Use markdown for formatting.
-"""
-                        ethical_considerations = generate_gemini_content(prompt)
-                        if ethical_considerations:
-                            st.markdown(ethical_considerations)
-                    else:
-                        st.warning("Please describe the AI application.")
-
-            elif ai_python_task == "🔒 Data Privacy Recommendations":
-                st.subheader("🔒 Data Privacy Recommendations")
-                data_types_handled = st.text_area("Describe the types of data being handled (e.g., 'customer personal information', 'health records', 'financial transactions', 'anonymized user behavior'):", height=100, key="ai_privacy_data_types")
-                if st.button("Generate Privacy Recommendations", type="primary"):
-                    if data_types_handled:
-                        prompt = f"""You are an expert in data privacy and security regulations (e.g., GDPR, CCPA).
-Given the following data context (DataFrame schema and sample) and types of data being handled:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Types of Data Being Handled:
-{data_types_handled}
-
-Provide comprehensive recommendations for ensuring data privacy and security.
-Include considerations for data collection, storage, processing, sharing, and retention.
-Mention relevant privacy principles and techniques (e.g., anonymization, pseudonymization, encryption).
-Use markdown for formatting.
-"""
-                        privacy_recs = generate_gemini_content(prompt)
-                        if privacy_recs:
-                            st.markdown(privacy_recs)
-                    else:
-                        st.warning("Please describe the types of data being handled.")
-
-            elif ai_python_task == "📄 Automated Report Generation (Draft)":
-                st.subheader("📄 Automated Report Generation (Draft)")
-                report_purpose = st.text_area("Describe the purpose of the report (e.g., 'monthly sales performance', 'customer churn analysis', 'project status update'):", height=80, key="ai_report_purpose")
-                key_metrics_report = st.multiselect("Select key columns/metrics to include in the report:", df.columns.tolist(), key="ai_report_metrics")
-                additional_sections = st.text_area("Any additional sections or specific points to include (e.g., 'executive summary', 'recommendations', 'future outlook'):", height=80, key="ai_report_sections")
-                if st.button("Draft Report Sections", type="primary"):
-                    if report_purpose and key_metrics_report:
-                        prompt = f"""You are an expert business analyst and report writer.
-Given the following data context (DataFrame schema and sample) and report requirements:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Report Purpose: {report_purpose}
-Key Metrics/Columns to Include: {', '.join(key_metrics_report)}
-Additional Sections: {additional_sections if additional_sections else 'None'}
-
-Draft the main sections of an automated report.
-For each section, provide a placeholder for content and suggest what kind of data-driven insights or visualizations should be included.
-Sections might include: Executive Summary, Key Findings, Detailed Analysis (for each metric), Recommendations, Conclusion.
-Use markdown for formatting.
-"""
-                        report_draft = generate_gemini_content(prompt)
-                        if report_draft:
-                            st.markdown(report_draft)
-                    else:
-                        st.warning("Please describe the report purpose and select key metrics.")
-
-            elif ai_python_task == "💬 Sentiment Analysis (Conceptual)":
-                st.subheader("💬 Sentiment Analysis (Conceptual)")
-                text_cols_sentiment = df.select_dtypes(include=['object', 'category']).columns.tolist()
-                if not text_cols_sentiment:
-                    st.info("No text columns found for sentiment analysis.")
-                else:
-                    sentiment_col = st.selectbox("Select text column for sentiment analysis:", text_cols_sentiment, key="ai_sentiment_col")
-                    if st.button("Perform Conceptual Sentiment Analysis", type="primary"):
-                        if sentiment_col:
-                            prompt = f"""You are an expert in natural language processing and sentiment analysis.
-Given the following data context (DataFrame schema and sample) and a text column:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Text Column for Analysis: '{sentiment_col}'
-
-Conceptually perform sentiment analysis on the text in this column.
-Describe the overall sentiment (e.g., positive, negative, neutral) and identify any common themes or keywords associated with different sentiments.
-Suggest how this analysis could be used. Use markdown for formatting.
-"""
-                            sentiment_report = generate_gemini_content(prompt)
-                            if sentiment_report:
-                                st.markdown(sentiment_report)
-                        else:
-                            st.warning("Please select a text column.")
-
-            elif ai_python_task == "🏷️ Topic Modeling (Conceptual)":
-                st.subheader("🏷️ Topic Modeling (Conceptual)")
-                text_cols_topic = df.select_dtypes(include=['object', 'category']).columns.tolist()
-                if not text_cols_topic:
-                    st.info("No text columns found for topic modeling.")
-                else:
-                    topic_col = st.selectbox("Select text column for topic modeling:", text_cols_topic, key="ai_topic_col")
-                    if st.button("Perform Conceptual Topic Modeling", type="primary"):
-                        if topic_col:
-                            prompt = f"""You are an expert in natural language processing and topic modeling.
-Given the following data context (DataFrame schema and sample) and a text column:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Text Column for Analysis: '{topic_col}'
-
-Conceptually perform topic modeling on the text in this column.
-Identify and describe 3-5 potential topics that might emerge from this text data.
-For each topic, list keywords that would likely define it.
-Suggest how this analysis could be used. Use markdown for formatting.
-"""
-                            topic_report = generate_gemini_content(prompt)
-                            if topic_report:
-                                st.markdown(topic_report)
-                        else:
-                            st.warning("Please select a text column.")
-
-            elif ai_python_task == "👥 Customer Segmentation Insights":
-                st.subheader("👥 Customer Segmentation Insights")
-                customer_cols = st.multiselect("Select columns relevant to customer behavior or demographics (e.g., 'age', 'income', 'purchase_history', 'city'):", df.columns.tolist(), key="ai_customer_cols")
-                if st.button("Generate Segmentation Insights", type="primary"):
-                    if customer_cols:
-                        prompt = f"""You are an expert in customer analytics and market segmentation.
-Given the following data context (DataFrame schema and sample) and relevant customer columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Relevant Customer Columns: {', '.join(customer_cols)}
-
-Suggest potential customer segments that could exist within this dataset.
-For each segment, describe its likely characteristics and provide insights into how a business could target or serve them.
-Suggest methods (e.g., clustering, RFM analysis) to identify these segments.
-Use markdown for formatting.
-"""
-                        segmentation_insights = generate_gemini_content(prompt)
-                        if segmentation_insights:
-                            st.markdown(segmentation_insights)
-                    else:
-                        st.warning("Please select relevant customer columns.")
-
-            elif ai_python_task == "📈 Market Trend Analysis":
-                st.subheader("📈 Market Trend Analysis")
-                time_cols_trend = df.select_dtypes(include=['datetime64']).columns.tolist()
-                numeric_cols_trend = df.select_dtypes(include=np.number).columns.tolist()
-                if not time_cols_trend or not numeric_cols_trend:
-                    st.info("Requires both datetime and numeric columns for market trend analysis.")
-                else:
-                    time_col_trend = st.selectbox("Select time column:", time_cols_trend, key="ai_trend_time_col")
-                    value_col_trend = st.selectbox("Select numeric value column (e.g., 'sales', 'price', 'volume'):", numeric_cols_trend, key="ai_trend_value_col")
-                    if st.button("Analyze Market Trends", type="primary"):
-                        if time_col_trend and value_col_trend:
-                            prompt = f"""You are an expert in market analysis and time series data.
-Given the following data context (DataFrame schema and sample) with a time column and a value column:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Time Column: '{time_col_trend}'
-Value Column: '{value_col_trend}'
-
-Analyze the potential market trends in this data.
-Identify and describe any observed trends (e.g., upward, downward, cyclical, seasonal).
-Discuss potential factors influencing these trends and their business implications.
-Suggest methods (e.g., moving averages, decomposition) to analyze these trends.
-Use markdown for formatting.
-"""
-                            trend_analysis = generate_gemini_content(prompt)
-                            if trend_analysis:
-                                st.markdown(trend_analysis)
-                        else:
-                            st.warning("Please select both a time column and a value column.")
-
-            elif ai_python_task == "⚠️ Risk Assessment Insights":
-                st.subheader("⚠️ Risk Assessment Insights")
-                scenario_description = st.text_area("Describe the business scenario or area you want to assess for risks (e.g., 'launching a new product', 'expanding into a new market', 'managing customer churn'):", height=100, key="ai_risk_scenario")
-                relevant_cols_risk = st.multiselect("Select columns that might be relevant to assessing risks:", df.columns.tolist(), key="ai_risk_cols")
-                if st.button("Assess Risks", type="primary"):
-                    if scenario_description and relevant_cols_risk:
-                        prompt = f"""You are an expert in business risk management and data analysis.
-Given the following data context (DataFrame schema and sample), a business scenario, and relevant columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Business Scenario:
-{scenario_description}
-
-Relevant Columns: {', '.join(relevant_cols_risk)}
-
-Identify potential risks associated with this scenario, leveraging insights from the provided data context.
-For each risk, describe its potential impact and likelihood, and suggest mitigation strategies.
-Use markdown for formatting.
-"""
-                        risk_insights = generate_gemini_content(prompt)
-                        if risk_insights:
-                            st.markdown(risk_insights)
-                    else:
-                        st.warning("Please describe the scenario and select relevant columns.")
-
-            elif ai_python_task == "📦 Supply Chain Optimization Suggestions":
-                st.subheader("📦 Supply Chain Optimization Suggestions")
-                supply_chain_problem = st.text_area("Describe a specific supply chain problem or goal (e.g., 'reduce inventory costs', 'improve delivery times', 'optimize warehouse operations'):", height=100, key="ai_sc_problem")
-                relevant_cols_sc = st.multiselect("Select columns relevant to supply chain (e.g., 'inventory_level', 'delivery_date', 'order_quantity', 'supplier_id'):", df.columns.tolist(), key="ai_sc_cols")
-                if st.button("Suggest Optimization Strategies", type="primary"):
-                    if supply_chain_problem and relevant_cols_sc:
-                        prompt = f"""You are an expert in supply chain management and optimization.
-Given the following data context (DataFrame schema and sample), a supply chain problem/goal, and relevant columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Supply Chain Problem/Goal:
-{supply_chain_problem}
-
-Relevant Columns: {', '.join(relevant_cols_sc)}
-
-Suggest data-driven strategies and approaches to optimize the supply chain for the described problem/goal.
-Focus on how the provided data could be used to achieve these optimizations.
-Use markdown for formatting.
-"""
-                        sc_suggestions = generate_gemini_content(prompt)
-                        if sc_suggestions:
-                            st.markdown(sc_suggestions)
-                    else:
-                        st.warning("Please describe the supply chain problem and select relevant columns.")
-
-            elif ai_python_task == "🛒 Personalized Recommendation Engine (Conceptual)":
-                st.subheader("🛒 Personalized Recommendation Engine (Conceptual)")
-                user_id_col = st.selectbox("Select User ID column:", ['None'] + df.columns.tolist(), key="ai_rec_user_id")
-                item_id_col = st.selectbox("Select Item ID column:", ['None'] + df.columns.tolist(), key="ai_rec_item_id")
-                interaction_col = st.selectbox("Select Interaction column (e.g., 'rating', 'purchase_count', 'view_duration'):", ['None'] + df.columns.tolist(), key="ai_rec_interaction")
-                if st.button("Explain Recommendation Engine", type="primary"):
-                    if user_id_col != 'None' and item_id_col != 'None' and interaction_col != 'None':
-                        prompt = f"""You are an expert in building personalized recommendation systems.
-Given the following data context (DataFrame schema and sample) with user, item, and interaction columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-User ID Column: '{user_id_col}'
-Item ID Column: '{item_id_col}'
-Interaction Column: '{interaction_col}'
-
-Explain conceptually how a personalized recommendation engine could be built using this data.
-Describe different types of recommendation approaches (e.g., collaborative filtering, content-based) and what kind of insights they could provide.
-Suggest how these recommendations could benefit a business.
-Use markdown for formatting.
-"""
-                        rec_engine_explanation = generate_gemini_content(prompt)
-                        if rec_engine_explanation:
-                            st.markdown(rec_engine_explanation)
-                    else:
-                        st.warning("Please select User ID, Item ID, and Interaction columns.")
-
-            elif ai_python_task == "🧪 A/B Testing Interpretation":
-                st.subheader("🧪 A/B Testing Interpretation")
-                ab_test_results = st.text_area("Paste your A/B test results here (e.g., 'Control Group Conversion Rate: 10%, Variant Group Conversion Rate: 12%, P-value: 0.03, Sample Size: 1000 per group'):", height=150, key="ai_ab_test_results")
-                if st.button("Interpret A/B Test Results", type="primary"):
-                    if ab_test_results:
-                        prompt = f"""You are an expert in A/B testing and statistical inference.
-Given the following A/B test results:
-
-{ab_test_results}
-
-Interpret these results in plain language.
-State whether the variant had a statistically significant impact.
-Explain the practical implications for the business and suggest clear next steps (e.g., 'launch the variant', 'run more tests', 'investigate further').
-Use markdown for formatting.
-"""
-                        ab_interpretation = generate_gemini_content(prompt)
-                        if ab_interpretation:
-                            st.markdown(ab_interpretation)
-                    else:
-                        st.warning("Please paste your A/B test results.")
-
-            elif ai_python_task == "🎲 Simulation Scenario Generation":
-                st.subheader("🎲 Simulation Scenario Generation")
-                process_model_desc = st.text_area("Describe the business process or model you want to simulate (e.g., 'customer journey through our website', 'manufacturing production line', 'call center operations'):", height=100, key="ai_sim_process_desc")
-                key_variables_sim = st.multiselect("Select key variables or parameters for the simulation:", df.columns.tolist(), key="ai_sim_vars")
-                if st.button("Generate Simulation Scenarios", type="primary"):
-                    if process_model_desc and key_variables_sim:
-                        prompt = f"""You are an expert in business process modeling and simulation.
-Given the following data context (DataFrame schema and sample), a business process/model, and key variables:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Business Process/Model:
-{process_model_desc}
-
-Key Variables/Parameters: {', '.join(key_variables_sim)}
-
-Generate several distinct simulation scenarios (e.g., 'best case', 'worst case', 'most likely', 'stress test').
-For each scenario, describe the assumptions about the key variables and the expected outcomes.
-Suggest how these scenarios could be used for decision-making.
-Use markdown for formatting.
-"""
-                        sim_scenarios = generate_gemini_content(prompt)
-                        if sim_scenarios:
-                            st.markdown(sim_scenarios)
-                    else:
-                        st.warning("Please describe the process and select key variables.")
-
-            elif ai_python_task == "⚔️ Competitive Analysis Insights":
-                st.subheader("⚔️ Competitive Analysis Insights")
-                competitor_data_input = st.text_area("Provide information about a competitor or the competitive landscape (e.g., 'Competitor X has lower prices but slower delivery', 'Market is saturated with similar products', 'Our product has feature A, Competitor B has feature B'):", height=150, key="ai_comp_data_input")
-                if st.button("Generate Competitive Insights", type="primary"):
-                    if competitor_data_input:
-                        prompt = f"""You are an expert in market strategy and competitive analysis.
-Given the following data context (DataFrame schema and sample) and competitor information:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Competitor Information:
-{competitor_data_input}
-
-Generate insights into the competitive landscape.
-Identify potential competitive advantages or disadvantages for your business.
-Suggest strategic moves or areas for improvement based on this analysis.
-Use frameworks like SWOT or Porter's Five Forces conceptually if applicable.
-Use markdown for formatting.
-"""
-                        comp_insights = generate_gemini_content(prompt)
-                        if comp_insights:
-                            st.markdown(comp_insights)
-                    else:
-                        st.warning("Please provide competitor information.")
-
-            elif ai_python_task == "💰 Resource Allocation Optimization":
-                st.subheader("💰 Resource Allocation Optimization")
-                resources_desc = st.text_area("Describe the resources to be allocated (e.g., 'marketing budget', 'sales team headcount', 'production capacity'):", height=80, key="ai_res_desc")
-                objectives_desc = st.text_area("Describe the objectives to optimize for (e.g., 'maximize profit', 'minimize cost', 'increase customer satisfaction'):", height=80, key="ai_obj_desc")
-                relevant_cols_res = st.multiselect("Select columns relevant to resources and objectives (e.g., 'cost', 'revenue', 'customer_satisfaction_score', 'employee_performance'):", df.columns.tolist(), key="ai_res_cols")
-                if st.button("Suggest Allocation Strategies", type="primary"):
-                    if resources_desc and objectives_desc and relevant_cols_res:
-                        prompt = f"""You are an expert in operations research and resource allocation.
-Given the following data context (DataFrame schema and sample), resources, objectives, and relevant columns:
-
-DataFrame Schema:
-{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}
-
-Sample Data:
-{df.head().to_string()}
-
-Resources to be Allocated: {resources_desc}
-Objectives to Optimize For: {objectives_desc}
-Relevant Columns: {', '.join(relevant_cols_res)}
-
-Suggest data-driven strategies for optimal resource allocation.
-Explain how the provided data could inform these decisions and what kind of analysis (e.g., linear programming, simulation) might be needed.
-Use markdown for formatting.
-"""
-                        res_alloc_strategies = generate_gemini_content(prompt)
-                        if res_alloc_strategies:
-                            st.markdown(res_alloc_strategies)
-                    else:
-                        st.warning("Please describe resources, objectives, and select relevant columns.")
-
-            elif ai_python_task == "Explain Model Predictions":
-                st.subheader("🧠 Explain Model Predictions (Conceptual)")
-                st.info("This feature conceptually explains how a model might arrive at a prediction given input features. It does not run a real model.")
-                model_type_exp = st.text_input("Model Type (e.g., RandomForest, LogisticRegression, Neural Network):", key="ai_explain_model_type")
-                features_input_exp = st.text_area("Input features (e.g., {'age': 30, 'income': 50000, 'city': 'New York'}):", height=100, key="ai_explain_features_input")
-                prediction_exp = st.text_input("Model Prediction (e.g., 'Yes', 0.85, 123.45):", key="ai_explain_prediction")
-                if st.button("Explain Prediction"):
-                    if model_type_exp and features_input_exp and prediction_exp:
-                        prompt = f"""You are an expert in Machine Learning Explainability (XAI).
-Given the following:
-- Model Type: {model_type_exp}
-- Input Features: {features_input_exp}
-- Model Prediction: {prediction_exp}
-
-Explain conceptually why the model might have made this prediction. Discuss which features likely contributed most to the prediction and how.
-Use concepts like feature importance, positive/negative contributions, or decision paths (depending on the model type).
-Provide a plain-language explanation.
-"""
-                        explanation = generate_gemini_content(prompt)
-                        if explanation:
-                            st.markdown(explanation)
-                    else:
-                        st.warning("Please provide model type, input features, and the prediction.")
-
-            elif ai_python_task == "Suggest Hyperparameters":
-                st.subheader("⚙️ Suggest Hyperparameters")
-                if df.empty:
-                    st.warning("DataFrame is empty. Please upload data.")
-                else:
-                    model_name_hp = st.text_input("ML Model Name (e.g., RandomForestClassifier, XGBRegressor, LogisticRegression):", key="ai_hp_model_name")
-                    target_col_hp = st.selectbox("Select target column (optional, for context):", ['None'] + df.columns.tolist(), key="ai_hp_target_col")
-                    target_col_hp_val = None if target_col_hp == 'None' else target_col_hp
-
-                    if st.button("Suggest Hyperparameters"):
-                        if model_name_hp:
-                            prompt = f"""You are an expert machine learning engineer specializing in hyperparameter tuning.
-Given a pandas DataFrame `df` with the following schema:
-Schema:\n{pd.DataFrame({'Column': df.columns, 'DataType': df.dtypes.astype(str)}).to_string()}\n\nSample Data:\n{df.head().to_string()}
-
-For the machine learning model '{model_name_hp}' (and potentially predicting '{target_col_hp_val}' if specified), suggest a set of common and important hyperparameters.
-For each hyperparameter, explain its role and provide a typical range of values to consider for tuning.
-Provide the suggestions in markdown format.
-"""
-                            hyperparameter_suggestions = generate_gemini_content(prompt)
-                            if hyperparameter_suggestions:
-                                st.markdown(hyperparameter_suggestions)
-                        else:
-                            st.warning("Please enter an ML model name.")
-
-            elif ai_python_task == "Evaluate Model Performance":
-                st.subheader("📊 Evaluate Model Performance")
-                true_labels_input = st.text_area("True Labels (comma-separated, e.g., 0,1,0,1 or 10.5,12.1,11.0):", height=100, key="ai_eval_true_labels")
-                predictions_input = st.text_area("Model Predictions (comma-separated, e.g., 0,1,1,0 or 10.1,11.9,11.2):", height=100, key="ai_eval_predictions")
-                eval_task = st.radio("Evaluation Task:", ["Classification", "Regression"], key="ai_eval_task")
-                if st.button("Evaluate Performance"):
-                    if true_labels_input and predictions_input:
-                        prompt = f"""You are an expert in machine learning model evaluation.
-Given the following true labels and model predictions:
-- True Labels: {true_labels_input}
-- Model Predictions: {predictions_input}
-- Evaluation Task: {eval_task}
-
-Provide a comprehensive evaluation report. Calculate common metrics (e.g., accuracy, precision, recall, F1-score for classification; MSE, RMSE, R2 for regression).
-Provide Python code to calculate these metrics. Interpret the results in plain language.
-"""
-                        evaluation_report = generate_gemini_content(prompt)
-                        if evaluation_report:
-                            st.markdown(evaluation_report)
-                    else:
-                        st.warning("Please provide both true labels and model predictions.")
-
-            elif ai_python_task == "Generate Executive Summary":
-                st.subheader("📝 Generate Executive Summary")
-                analysis_summary_input = st.text_area("Paste your analysis findings or key data points here:", height=200, key="ai_python_exec_summary_input")
-                if st.button("✨ Generate Summary"):
-                    if analysis_summary_input:
-                        prompt = f"You are an expert business analyst. Based on the following analysis findings, generate a concise executive summary (approx. 150-200 words) highlighting key insights, implications, and recommendations.\n\nFindings:\n{analysis_summary_input}"
-                        exec_summary = generate_gemini_content(prompt)
-                        if exec_summary:
-                            st.markdown(exec_summary)
-                    else:
-                        st.warning("Please provide some analysis findings.")
-
-            elif ai_python_task == "Summarize Key Findings":
-                st.subheader("📄 Summarize Key Findings")
-                findings_input = st.text_area("Paste your detailed findings or report sections here:", height=200, key="ai_python_summarize_findings_input")
-                if st.button("✨ Summarize Findings"):
-                    if findings_input:
-                        prompt = f"You are an expert summarizer. Condense the following text into bullet points of key findings. Focus on the most important insights and conclusions.\n\nText:\n{findings_input}"
-                        summary_findings = generate_gemini_content(prompt)
-                        if summary_findings:
-                            st.markdown(summary_findings)
-                    else:
-                        st.warning("Please provide text to summarize.")
-
-            elif ai_python_task == "Translate Code Comments":
-                st.subheader("🌐 Translate Code Comments")
-                code_with_comments = st.text_area("Paste code with comments to translate:", height=200, key="ai_python_translate_comments_code")
-                target_language = st.text_input("Target Language (e.g., Spanish, French, Hindi):", value="English", key="ai_python_translate_comments_lang")
-                if st.button("✨ Translate Comments"):
-                    if code_with_comments and target_language:
-                        prompt = f"You are a multilingual programmer. Translate only the comments in the following Python code to {target_language}. Keep the code itself unchanged. Provide only the translated code in a single code block.\n\nCode:\n```python\n{code_with_comments}\n```"
-                        translated_code = generate_gemini_content(prompt)
-                        if translated_code:
-                            st.code(translated_code, language='python')
-                    else:
-                        st.warning("Please paste code and specify a target language.")
-
-            elif ai_python_task == "Generate Documentation":
-                st.subheader("📄 Generate Documentation")
-                code_for_docs = st.text_area("Paste Python code to generate documentation for:", height=200, key="ai_python_generate_docs_code")
-                if st.button("✨ Generate Docs"):
-                    if code_for_docs:
-                        prompt = f"You are an expert technical writer. Generate comprehensive documentation for the following Python code. Include a description of its purpose, parameters, return values, and usage examples. Use markdown for formatting.\n\nCode:\n```python\n{code_for_docs}\n```"
-                        documentation = generate_gemini_content(prompt)
-                        if documentation:
-                            st.markdown(documentation)
-                    else:
-                        st.warning("Please paste code to generate documentation for.")
-
         # Code History
         st.subheader("📚 Python Code History")
         if st.session_state.python_history:

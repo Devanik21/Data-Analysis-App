@@ -225,26 +225,24 @@ def execute_sql_query(df: pd.DataFrame, query: str) -> tuple[Optional[pd.DataFra
     conn = duckdb.connect(database=':memory:')
     conn.register('data', df)
     
-    query_upper = query.strip().upper()
-    is_dml = any(query_upper.startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE'])
+    query_type = "DML" if any(query.strip().upper().startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE']) else "SELECT"
 
     try:
         cursor = conn.execute(query)
         duration = time.time() - start_time
         
-        if is_dml:
-            # For DML, the "result" is the entire updated table.
-            result_df = conn.execute('SELECT * FROM data').fetchdf()
+        if query_type == "DML":
+            # For DML, the operation modifies the registered 'data' table.
+            # The calling function will re-fetch the entire 'data' table if needed.
+            return None, None, duration # No result_df for DML, success
         else:
             # For SELECT, EXPLAIN, etc., fetch the result from the original cursor
             result_df = cursor.fetchdf()
-            
-        conn.close()
-        return result_df, None, duration
+            return result_df, None, duration
     except Exception as e:
         conn.close()
         duration = time.time() - start_time
-        return None, str(e), duration
+        return None, str(e), duration # Error, no result_df
 
 def advanced_outlier_detection(df: pd.DataFrame, column: str) -> dict:
     """Advanced outlier detection using multiple methods"""
@@ -992,16 +990,16 @@ elif selected_tool == "🔍 SQL Query Engine":
         with main_col:
             st.subheader("✍️ SQL Query Editor")
             st.info("You can run `SELECT` statements to query data, or DML statements like `UPDATE`, `INSERT`, `DELETE` to modify the in-memory DataFrame for this session.")
-            query = st.text_area(
+            sql_query_text = st.text_area(
                 "Enter your SQL query here. The table is named `data`.",
                 value=st.session_state.get('current_query', "SELECT * FROM data WHERE age > :min_age;"),
                 height=200,
                 key="sql_query_editor"
             )
-            st.session_state.current_query = query
+            st.session_state.current_query = sql_query_text
 
             # --- Parameter Substitution ---
-            final_query = query
+            final_query = sql_query_text
             try:
                 for param in st.session_state.sql_params:
                     param_name = param.get("Parameter")
@@ -1024,30 +1022,37 @@ elif selected_tool == "🔍 SQL Query Engine":
             b_col1, b_col2, b_col3, b_col4 = st.columns(4)
             with b_col1:
                 if st.button("🚀 Execute Query", type="primary", use_container_width=True):
-                    is_dml = any(final_query.strip().upper().startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE'])
+                    query_type = "DML" if any(final_query.strip().upper().startswith(s) for s in ['INSERT', 'UPDATE', 'DELETE']) else "SELECT"
                     
-                    result, error, duration = execute_sql_query(df, final_query) # result is new full df for DML
+                    # For DML, we need to pass the original df to execute_sql_query,
+                    # and then re-fetch the updated df if successful.
+                    # For SELECT, execute_sql_query returns the result df.
+                    select_result_df, error, duration = execute_sql_query(df, final_query)
                     st.session_state.sql_query_duration = duration
                     if error:
                         st.session_state.sql_result = None
                         st.error(f"SQL Error: {error}")
                     else:
-                        if is_dml:
-                            st.session_state.df = result # Update the main dataframe
+                        if query_type == "DML":
+                            # Re-fetch the entire 'data' table after a successful DML operation
+                            updated_df_after_dml, dml_error, _ = execute_sql_query(df, 'SELECT * FROM data')
+                            if dml_error:
+                                st.error(f"Error re-fetching data after DML: {dml_error}")
+                            else:
+                                st.session_state.df = updated_df_after_dml # Update the main dataframe
+                                st.success(f"DML query executed successfully in {duration:.4f}s. The data has been updated.")
+                                st.info("The main DataFrame has been updated. Rerunning to reflect changes across the app.")
+                                st.rerun() # Rerun to reflect changes
                             st.session_state.sql_result = None # Clear previous query results
-                            st.success(f"DML query executed successfully in {duration:.4f}s. The data has been updated.")
-                            st.info("The main DataFrame has been updated. Rerunning to reflect changes across the app.")
-                            st.rerun()
                         else:
                             # This is a SELECT query
-                            st.session_state.sql_result = result
+                            st.session_state.sql_result = select_result_df
                             st.session_state.sql_history.append({
-                                'query': query, # Save original query with parameters
+                                'query': sql_query_text, # Save original query with parameters
                                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                'rows': len(result),
+                                'rows': len(select_result_df),
                                 'duration': duration
                             })
-                            st.success(f"Query executed successfully in {duration:.4f} seconds! Returned {len(result)} rows.")
             with b_col2:
                 if st.button("📊 Explain Query", use_container_width=True):
                     if final_query:

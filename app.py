@@ -4733,7 +4733,27 @@ if selected_tool == "🦄 AI-Powered Insights (Gemini)":
             "📊 Natural Language to Chart",
             "🛠️ Feature Engineering Suggestions",
             "💬 Natural Language to Code",
-            "🧠 Code Explanation"
+            "🧠 Code Explanation",
+            "📖 Data Storytelling/Narrative Generation",
+            "🚨 Anomaly Detection Explanation",
+            "🔍 Root Cause Analysis (Conceptual)",
+            "🔮 Predictive Modeling Insights",
+            "💡 Hypothesis Generation",
+            "🧹 Data Quality Improvement Plan",
+            "⚖️ Ethical AI Considerations",
+            "🔒 Data Privacy Recommendations",
+            "📄 Automated Report Generation (Draft)",
+            "💬 Sentiment Analysis (Conceptual)",
+            "🏷️ Topic Modeling (Conceptual)",
+            "👥 Customer Segmentation Insights",
+            "📈 Market Trend Analysis",
+            "⚠️ Risk Assessment Insights",
+            "📦 Supply Chain Optimization Suggestions",
+            "🛒 Personalized Recommendation Engine (Conceptual)",
+            "🧪 A/B Testing Interpretation",
+            "🎲 Simulation Scenario Generation",
+            "⚔️ Competitive Analysis Insights",
+            "💰 Resource Allocation Optimization"
         ]
         selected_ai_task = st.selectbox("Select an AI Task", ai_options)
 

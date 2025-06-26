@@ -527,141 +527,141 @@ def scrape_website(
         exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re, 'requests': requests} # Add 'requests' for custom code
         
         if method == "Extract Text by Tag":
-                tag = method_params.get('tag', 'p')
-                class_name = method_params.get('class_name', '')
-                limit = method_params.get('limit', 10)
+            tag = method_params.get('tag', 'p')
+            class_name = method_params.get('class_name', '')
+            limit = method_params.get('limit', 10)
+            
+            if class_name:
+                elements = soup.find_all(tag, class_=class_name)
+            else:
+                elements = soup.find_all(tag)
+            
+            for elem in elements[:limit]:
+                results.append({
+                    'text': elem.get_text().strip(),
+                    'tag': tag,
+                    'html': str(elem)
+                })
+        
+        elif method == "Extract by CSS Selector":
+            selector = method_params.get('selector', 'p')
+            limit = method_params.get('limit', 10)
+            
+            elements = soup.select(selector)
+            for elem in elements[:limit]:
+                results.append({
+                    'text': elem.get_text().strip(),
+                    'selector': selector,
+                    'html': str(elem)
+                })
+        
+        elif method == "Extract Table Data":
+            table_index = method_params.get('table_index', 0)
+            tables = soup.find_all('table')
+            
+            if tables and len(tables) > table_index:
+                table = tables[table_index]
+                rows = table.find_all('tr')
                 
-                if class_name:
-                    elements = soup.find_all(tag, class_=class_name)
-                else:
-                    elements = soup.find_all(tag)
-                
-                for elem in elements[:limit]:
+                for i, row in enumerate(rows):
+                    cells = row.find_all(['td', 'th'])
+                    row_data = [cell.get_text().strip() for cell in cells]
                     results.append({
-                        'text': elem.get_text().strip(),
-                        'tag': tag,
-                        'html': str(elem)
+                        'row_index': i,
+                        'data': row_data,
+                        'html': str(row)
                     })
+            else:
+                error_msg = f"Table {table_index} not found!"
+                st.error(error_msg)
+                report_data["Error"] = error_msg
+                return
+        
+        elif method == "Extract All Links":
+            filter_text = method_params.get('filter_text', '')
+            links = soup.find_all('a', href=True)
             
-            elif method == "Extract by CSS Selector":
-                selector = method_params.get('selector', 'p')
-                limit = method_params.get('limit', 10)
+            for link in links:
+                href = link['href']
+                text = link.get_text().strip()
                 
-                elements = soup.select(selector)
-                for elem in elements[:limit]:
+                if not filter_text or filter_text.lower() in text.lower():
                     results.append({
-                        'text': elem.get_text().strip(),
-                        'selector': selector,
-                        'html': str(elem)
+                        'url': href,
+                        'text': text,
+                        'full_url': requests.compat.urljoin(url, href)
                     })
+        
+        elif method == "Extract Images":
+            min_width = method_params.get('min_width', 0)
+            images = soup.find_all('img')
             
-            elif method == "Extract Table Data":
-                table_index = method_params.get('table_index', 0)
-                tables = soup.find_all('table')
+            for img in images:
+                src = img.get('src', '')
+                alt = img.get('alt', '')
+                width = img.get('width', 0)
                 
-                if tables and len(tables) > table_index:
-                    table = tables[table_index]
-                    rows = table.find_all('tr')
-                    
-                    for i, row in enumerate(rows):
-                        cells = row.find_all(['td', 'th'])
-                        row_data = [cell.get_text().strip() for cell in cells]
-                        results.append({
-                            'row_index': i,
-                            'data': row_data,
-                            'html': str(row)
-                        })
-                else:
-                    error_msg = f"Table {table_index} not found!"
-                    st.error(error_msg)
-                    report_data["Error"] = error_msg
-                    return
-            
-            elif method == "Extract All Links":
-                filter_text = method_params.get('filter_text', '')
-                links = soup.find_all('a', href=True)
+                try:
+                    width = int(width) if width else 0
+                except:
+                    width = 0
                 
-                for link in links:
-                    href = link['href']
-                    text = link.get_text().strip()
-                    
-                    if not filter_text or filter_text.lower() in text.lower():
-                        results.append({
-                            'url': href,
-                            'text': text,
-                            'full_url': requests.compat.urljoin(url, href)
-                        })
+                if width >= min_width:
+                    results.append({
+                        'src': src,
+                        'alt': alt,
+                        'width': width,
+                        'full_url': requests.compat.urljoin(url, src)
+                    })
+        
+        elif method == "Custom BeautifulSoup":
+            # Execute custom code from method_params
+            custom_code = method_params.get('custom_code', '')
+            # Execute the user's code
+            # The user's code is expected to populate the 'results' list or create a 'df_results' DataFrame
+            exec(custom_code, exec_globals)
+            results = exec_globals.get('results', [])
+        
+        # Display results
+        if results:
+            report_data["Items Extracted"] = len(results)
+            st.success(f"Successfully scraped {len(results)} items!")
             
-            elif method == "Extract Images":
-                min_width = method_params.get('min_width', 0)
-                images = soup.find_all('img')
+            # Convert to DataFrame for better display
+            # Check if the custom code created a DataFrame named 'df_results'
+            if 'df_results' in exec_globals and isinstance(exec_globals['df_results'], pd.DataFrame):
+                df_results = exec_globals['df_results']
+                st.subheader("Custom Code Results (DataFrame)")
+                st.dataframe(df_results)
+            elif results and isinstance(results[0], dict):
+                df_results = pd.DataFrame(results)
+                st.dataframe(df_results)
                 
-                for img in images:
-                    src = img.get('src', '')
-                    alt = img.get('alt', '')
-                    width = img.get('width', 0)
-                    
-                    try:
-                        width = int(width) if width else 0
-                    except:
-                        width = 0
-                    
-                    if width >= min_width:
-                        results.append({
-                            'src': src,
-                            'alt': alt,
-                            'width': width,
-                            'full_url': requests.compat.urljoin(url, src)
-                        })
-            
-            elif method == "Custom BeautifulSoup":
-                # Execute custom code from method_params
-                custom_code = method_params.get('custom_code', '')
-                # Execute the user's code
-                # The user's code is expected to populate the 'results' list or create a 'df_results' DataFrame
-                exec(custom_code, exec_globals)
-                results = exec_globals.get('results', [])
-            
-            # Display results
-            if results:
-                report_data["Items Extracted"] = len(results)
-                st.success(f"Successfully scraped {len(results)} items!")
-                
-                # Convert to DataFrame for better display
-                # Check if the custom code created a DataFrame named 'df_results'
-                if 'df_results' in exec_globals and isinstance(exec_globals['df_results'], pd.DataFrame):
-                    df_results = exec_globals['df_results']
-                    st.subheader("Custom Code Results (DataFrame)")
-                    st.dataframe(df_results)
-                elif results and isinstance(results[0], dict):
-                    df_results = pd.DataFrame(results)
-                    st.dataframe(df_results)
-                    
-                    # Export options
-                    if export_format == "CSV":
-                        csv_data = df_results.to_csv(index=False)
-                        st.download_button(
-                            "💾 Download CSV",
-                            csv_data,
-                            file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                            mime="text/csv"
-                        )
-                    elif export_format == "JSON":
-                        json_data = df_results.to_json(orient='records')
-                        st.download_button(
-                            "💾 Download JSON",
-                            data=json_data,
-                            file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                            mime="application/json"
-                        )
-                    elif export_format == "TXT": # Added TXT export
-                        txt_data = "\n".join([str(item) for item in results])
-                        st.download_button(
-                            "💾 Download TXT",
-                            data=txt_data,
-                            file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                            mime="text/plain"
-                        )
+                # Export options
+                if export_format == "CSV":
+                    csv_data = df_results.to_csv(index=False)
+                    st.download_button(
+                        "💾 Download CSV",
+                        csv_data,
+                        file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                elif export_format == "JSON":
+                    json_data = df_results.to_json(orient='records')
+                    st.download_button(
+                        "💾 Download JSON",
+                        data=json_data,
+                        file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json"
+                    )
+                elif export_format == "TXT": # Added TXT export
+                    txt_data = "\n".join([str(item) for item in results])
+                    st.download_button(
+                        "💾 Download TXT",
+                        data=txt_data,
+                        file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                        mime="text/plain"
+                    )
     except Exception as e: # Catch any other unexpected errors
         error_msg = f"Web scraping error: {str(e)}"
         st.error(error_msg)

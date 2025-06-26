@@ -5845,17 +5845,19 @@ Your code MUST:
                             st.success("AI-generated Python code populated in the editor!")
                             st.rerun()
                     else:
-        # Code History
-        st.subheader("📚 Python Code History")
-        if st.session_state.python_history:
-            for i, hist in enumerate(reversed(st.session_state.python_history[-5:])):
-                with st.expander(f"Code {len(st.session_state.python_history) - i} ({hist['timestamp']})"):
-                    st.code(hist['code'], language='python')
-                    if st.button("Reuse this code", key=f"reuse_python_{i}"):
-                        st.session_state.current_python_code = hist['code']
-                        st.rerun()
-        else:
-            st.info("No Python code executed in this session yet.")
+                        st.warning("Please enter a description for the AI to generate code.")
+
+            # Code History (moved outside the 'if ai_python_task == ...' block)
+            st.subheader("📚 Python Code History")
+            if st.session_state.python_history:
+                for i, hist in enumerate(reversed(st.session_state.python_history[-5:])):
+                    with st.expander(f"Code {len(st.session_state.python_history) - i} ({hist['timestamp']})"):
+                        st.code(hist['code'], language='python')
+                        if st.button("Reuse this code", key=f"reuse_python_{i}"):
+                            st.session_state.current_python_code = hist['code']
+                            st.rerun()
+            else:
+                st.info("No Python code executed in this session yet.")
 # Ensure df is always available if it's in session state, for tools that might be selected before data upload interaction
 if 'df' in st.session_state and st.session_state.df is not None and 'df' not in locals():
     df = st.session_state.df

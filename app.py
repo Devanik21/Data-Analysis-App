@@ -339,10 +339,29 @@ def generate_chart(df: pd.DataFrame, config: dict, title: str) -> None:
         st.error(f"Error generating chart: {str(e)}")
 
 def generate_gemini_content(prompt_text: str) -> Optional[str]:
-    """Generates content using the Gemini model."""
+    """Generates content using the Gemini model. Includes a timeout."""
     if not st.session_state.gemini_model:
         st.error("Gemini model not configured. Please enter your API key in the sidebar.")
         return None
+    
+    # Add a timeout to the Gemini API call
+    # The genai.GenerativeModel.generate_content method does not directly expose a timeout parameter.
+    # However, the underlying API client might have one, or it can be wrapped in a concurrent future.
+    # For simplicity and to avoid over-complicating the helper, we'll rely on the default behavior
+    # or assume the API client is configured for timeouts if needed.
+    # If a timeout is critical, one might use concurrent.futures.ThreadPoolExecutor.
+    
+    # Example of how a timeout could be implemented (conceptual, not directly in genai.generate_content)
+    # from concurrent.futures import ThreadPoolExecutor, TimeoutError
+    # with ThreadPoolExecutor(max_workers=1) as executor:
+    #     future = executor.submit(st.session_state.gemini_model.generate_content, prompt_text)
+    #     try:
+    #         response = future.result(timeout=60) # 60 seconds timeout
+    #         return response.text
+    #     except TimeoutError:
+    #         st.error("Gemini API call timed out after 60 seconds.")
+    #         return None
+
     try:
         with st.spinner("🤖 Gemini is thinking..."):
             response = st.session_state.gemini_model.generate_content(prompt_text)
@@ -412,29 +431,105 @@ def execute_python_code(code: str, df: pd.DataFrame) -> None:
         plt.close('all') # Close all matplotlib figures to free memory
         sys.stdout = original_stdout
 
-def scrape_website(url: str, method: str, params: dict, export_format: str) -> None:
-    """Perform web scraping based on selected method"""
+def scrape_website(
+    url: str,
+    method: str,
+    method_params: Dict[str, Any],
+    request_method: str,
+    request_payload: Optional[Dict[str, Any]],
+    custom_headers: Optional[Dict[str, str]],
+    custom_cookies: Optional[Dict[str, str]],
+    proxy_url: Optional[str],
+    max_retries: int,
+    request_delay: float,
+    request_timeout: int,
+    export_format: str
+) -> None:
+    """Perform web scraping based on selected method with advanced options."""
+    
+    st.subheader("Scraping Report")
+    report_data = {
+        "URL": url,
+        "Method": method,
+        "Request Method": request_method,
+        "Status Code": "N/A",
+        "Time Taken (s)": "N/A",
+        "Items Extracted": "N/A",
+        "Error": "None"
+    }
+
+    start_time = time.time()
+    response = None
     try:
-        headers_dict = {
-            'User-Agent': params.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-        } if params.get('headers') else {}
+        session = requests.Session()
+        if custom_headers:
+            session.headers.update(custom_headers)
+        if custom_cookies:
+            session.cookies.update(custom_cookies)
         
-        with st.spinner("Scraping website..."):
-            # Make request
-            time.sleep(float(params.get('delay', 1.0)))
-            response = requests.get(url, headers=headers_dict, timeout=params.get('timeout', 10))
-            response.raise_for_status()
+        request_proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+
+        for attempt in range(max_retries + 1):
+            try:
+                with st.spinner(f"Scraping website (Attempt {attempt + 1}/{max_retries + 1})..."):
+                    time.sleep(request_delay) # Delay before each attempt
+                    if request_method.upper() == 'POST':
+                        response = session.post(url, json=request_payload, timeout=request_timeout, proxies=request_proxies)
+                    else: # Default to GET
+                        response = session.get(url, timeout=request_timeout, proxies=request_proxies)
+                    response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+                    break # Success, exit retry loop
+            except requests.exceptions.HTTPError as e:
+                error_msg = f"HTTP Error {e.response.status_code} for {url}: {e}"
+                st.warning(error_msg)
+                report_data["Status Code"] = e.response.status_code
+                report_data["Error"] = error_msg
+                if attempt == max_retries:
+                    st.error(f"Failed after {max_retries + 1} attempts due to HTTP error.")
+                    return
+                time.sleep(request_delay * (2 ** attempt)) # Exponential backoff
+            except requests.exceptions.ConnectionError as e:
+                error_msg = f"Connection Error for {url}: {e}"
+                st.warning(error_msg)
+                report_data["Error"] = error_msg
+                if attempt == max_retries:
+                    st.error(f"Failed after {max_retries + 1} attempts due to connection error.")
+                    return
+                time.sleep(request_delay * (2 ** attempt)) # Exponential backoff
+            except requests.exceptions.Timeout as e:
+                error_msg = f"Timeout Error for {url}: {e}"
+                st.warning(error_msg)
+                report_data["Error"] = error_msg
+                if attempt == max_retries:
+                    st.error(f"Failed after {max_retries + 1} attempts due to timeout.")
+                    return
+                time.sleep(request_delay * (2 ** attempt)) # Exponential backoff
+            except requests.exceptions.RequestException as e:
+                error_msg = f"An unexpected request error occurred for {url}: {e}"
+                st.warning(error_msg)
+                report_data["Error"] = error_msg
+                if attempt == max_retries:
+                    st.error(f"Failed after {max_retries + 1} attempts due to unexpected request error.")
+                    return
+                time.sleep(request_delay * (2 ** attempt)) # Exponential backoff
+        
+        if response is None: # If all retries failed
+            st.error("Web scraping failed: No successful response received.")
+            return
+
+        report_data["Status Code"] = response.status_code
+        st.success(f"Successfully fetched URL: {url} (Status: {response.status_code})")
             
             # Parse HTML
             soup = BeautifulSoup(response.content, 'html.parser')
             
             results = []
-            exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re} # Define exec_globals for custom BS
+            exec_globals = {'soup': soup, 'results': [], 'pd': pd, 'np': np, 're': re, 'requests': requests} # Add 'requests' for custom code
             
             if method == "Extract Text by Tag":
-                tag = params.get('tag', 'p')
-                class_name = params.get('class_name', '')
-                limit = params.get('limit', 10)
+                tag = method_params.get('tag', 'p')
+                class_name = method_params.get('class_name', '')
+                limit = method_params.get('limit', 10)
                 
                 if class_name:
                     elements = soup.find_all(tag, class_=class_name)
@@ -449,8 +544,8 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                     })
             
             elif method == "Extract by CSS Selector":
-                selector = params.get('selector', 'p')
-                limit = params.get('limit', 10)
+                selector = method_params.get('selector', 'p')
+                limit = method_params.get('limit', 10)
                 
                 elements = soup.select(selector)
                 for elem in elements[:limit]:
@@ -461,7 +556,7 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                     })
             
             elif method == "Extract Table Data":
-                table_index = params.get('table_index', 0)
+                table_index = method_params.get('table_index', 0)
                 tables = soup.find_all('table')
                 
                 if tables and len(tables) > table_index:
@@ -477,11 +572,13 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                             'html': str(row)
                         })
                 else:
-                    st.error(f"Table {table_index} not found!")
+                    error_msg = f"Table {table_index} not found!"
+                    st.error(error_msg)
+                    report_data["Error"] = error_msg
                     return
             
             elif method == "Extract All Links":
-                filter_text = params.get('filter_text', '')
+                filter_text = method_params.get('filter_text', '')
                 links = soup.find_all('a', href=True)
                 
                 for link in links:
@@ -496,7 +593,7 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                         })
             
             elif method == "Extract Images":
-                min_width = params.get('min_width', 0)
+                min_width = method_params.get('min_width', 0)
                 images = soup.find_all('img')
                 
                 for img in images:
@@ -518,8 +615,8 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                         })
             
             elif method == "Custom BeautifulSoup":
-                # Execute custom code
-                custom_code = params.get('custom_code', '')
+                # Execute custom code from method_params
+                custom_code = method_params.get('custom_code', '')
                 # Execute the user's code
                 # The user's code is expected to populate the 'results' list or create a 'df_results' DataFrame
                 exec(custom_code, exec_globals)
@@ -527,6 +624,7 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
             
             # Display results
             if results:
+                report_data["Items Extracted"] = len(results)
                 st.success(f"Successfully scraped {len(results)} items!")
                 
                 # Convert to DataFrame for better display
@@ -556,8 +654,22 @@ def scrape_website(url: str, method: str, params: dict, export_format: str) -> N
                             file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                             mime="application/json"
                         )
-    except Exception as e:
-        st.error(f"Web scraping error: {str(e)}")
+                    elif export_format == "TXT": # Added TXT export
+                        txt_data = "\n".join([str(item) for item in results])
+                        st.download_button(
+                            "💾 Download TXT",
+                            data=txt_data,
+                            file_name=f"scraped_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            mime="text/plain"
+                        )
+    except Exception as e: # Catch any other unexpected errors
+        error_msg = f"Web scraping error: {str(e)}"
+        st.error(error_msg)
+        report_data["Error"] = error_msg
+    finally:
+        end_time = time.time()
+        report_data["Time Taken (s)"] = f"{end_time - start_time:.2f}"
+        st.dataframe(pd.DataFrame([report_data]).T.rename(columns={0: "Value"}))
 # Tool Implementation
 
 if selected_tool == "📤 Data Upload": # Keep this as the first tool
@@ -4486,12 +4598,17 @@ Memory usage: {df.memory_usage(deep=True).sum() / 1024**2:.2f} MB""")
 elif selected_tool == "🌐 Web Scraping Tool":
     st.markdown('<h2 class="tool-header">🌐 Advanced Web Scraping Tool</h2>', unsafe_allow_html=True)
     
-    st.subheader("🔗 URL and Element Configuration")
+    st.subheader("🔗 URL and Request Configuration")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
         url = st.text_input("🌐 Enter URL:", placeholder="https://example.com")
+        
+        request_method = st.radio("Request Method:", ["GET", "POST"], horizontal=True)
+        request_payload_str = None
+        if request_method == "POST":
+            request_payload_str = st.text_area("Request Payload (JSON format):", help="For POST requests, enter data in JSON format. E.g., {'key': 'value'}")
         
         # Scraping method
         method = st.selectbox("Scraping Method", [
@@ -4503,44 +4620,54 @@ elif selected_tool == "🌐 Web Scraping Tool":
             "Custom BeautifulSoup"
         ])
         
+        # Method-specific parameters (collected into method_params dict)
+        method_params = {}
         if method == "Extract Text by Tag":
-            tag = st.text_input("HTML Tag:", value="p")
-            class_name = st.text_input("CSS Class (optional):")
-            limit = st.number_input("Limit results:", min_value=1, max_value=100, value=10)
+            method_params['tag'] = st.text_input("HTML Tag:", value="p")
+            method_params['class_name'] = st.text_input("CSS Class (optional):")
+            method_params['limit'] = st.number_input("Limit results:", min_value=1, max_value=100, value=10)
             
         elif method == "Extract by CSS Selector":
-            selector = st.text_input("CSS Selector:", placeholder="div.content p")
-            limit = st.number_input("Limit results:", min_value=1, max_value=100, value=10)
+            method_params['selector'] = st.text_input("CSS Selector:", placeholder="div.content p")
+            method_params['limit'] = st.number_input("Limit results:", min_value=1, max_value=100, value=10)
             
         elif method == "Extract Table Data":
-            table_index = st.number_input("Table Index (0-based):", min_value=0, value=0)
+            method_params['table_index'] = st.number_input("Table Index (0-based):", min_value=0, value=0)
             
         elif method == "Extract All Links":
-            filter_text = st.text_input("Filter links containing text (optional):")
+            method_params['filter_text'] = st.text_input("Filter links containing text (optional):")
             
         elif method == "Extract Images":
-            min_width = st.number_input("Minimum width (optional):", min_value=0, value=0)
+            method_params['min_width'] = st.number_input("Minimum width (optional):", min_value=0, value=0)
             
         elif method == "Custom BeautifulSoup":
-            custom_code = st.text_area(
+            method_params['custom_code'] = st.text_area(
                 "Custom BeautifulSoup Code:",
                 value="""# Use 'soup' variable to access parsed HTML
 # Example:
-titles = soup.find_all('h1')
-for title in titles:
-    print(title.get_text())""",
+# titles = soup.find_all('h1')
+# for title in titles:
+#     print(title.get_text())
+#
+# To return a DataFrame:
+# results = []
+# for item in soup.select('.some-item'):
+#     results.append({'title': item.select_one('.title').get_text()})
+# df_results = pd.DataFrame(results)
+""",
                 height=150
             )
     
     with col2:
-        st.subheader("⚙️ Advanced Settings")
-        
-        headers = st.checkbox("Use Custom Headers")
-        if headers:
-            user_agent = st.text_input("User Agent:", value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        
-        delay = st.slider("Delay between requests (seconds):", 0.0, 5.0, 1.0)
-        timeout = st.slider("Request timeout (seconds):", 5, 30, 10)
+        st.subheader("⚙️ Advanced Request Settings")
+        with st.expander("Configure Request Details", expanded=True):
+            custom_headers_str = st.text_area("Custom Headers (JSON format):", help="E.g., {'User-Agent': 'MyScraper'}")
+            custom_cookies_str = st.text_area("Custom Cookies (JSON format):", help="E.g., {'sessionid': 'abc'}")
+            proxy_url = st.text_input("Proxy URL (e.g., http://user:pass@host:port):", help="Leave blank for no proxy.")
+            
+            max_retries = st.number_input("Max Retries on Failure:", min_value=0, value=3, step=1)
+            request_delay = st.slider("Delay between requests (seconds):", 0.0, 10.0, 1.0, step=0.1)
+            request_timeout = st.slider("Request timeout (seconds):", 5, 60, 10)
         
         # Export options
         export_format = st.selectbox("Export Format", ["CSV", "JSON", "TXT"])
@@ -4549,29 +4676,46 @@ for title in titles:
         if not url:
             st.error("Please enter a URL!")
         else:
-            # Build params dict explicitly for robustness
-            scrape_params = {
-                'headers': headers,
-                'delay': delay,
-                'timeout': timeout
-            }
-            if headers:
-                scrape_params['user_agent'] = user_agent
-            
-            if method == "Extract Text by Tag":
-                scrape_params.update({'tag': tag, 'class_name': class_name, 'limit': limit})
-            elif method == "Extract by CSS Selector":
-                scrape_params.update({'selector': selector, 'limit': limit})
-            elif method == "Extract Table Data":
-                scrape_params.update({'table_index': table_index})
-            elif method == "Extract All Links":
-                scrape_params.update({'filter_text': filter_text})
-            elif method == "Extract Images":
-                scrape_params.update({'min_width': min_width})
-            elif method == "Custom BeautifulSoup":
-                scrape_params.update({'custom_code': custom_code})
+            # Parse JSON inputs
+            request_payload = None
+            if request_method == "POST" and request_payload_str:
+                try:
+                    request_payload = json.loads(request_payload_str)
+                except json.JSONDecodeError:
+                    st.error("Invalid JSON format for Request Payload. Please correct it.")
+                    st.stop()
 
-            scrape_website(url, method, scrape_params, export_format)
+            custom_headers = None
+            if custom_headers_str:
+                try:
+                    custom_headers = json.loads(custom_headers_str)
+                except json.JSONDecodeError:
+                    st.error("Invalid JSON format for Custom Headers. Please correct it.")
+                    st.stop()
+
+            custom_cookies = None
+            if custom_cookies_str:
+                try:
+                    custom_cookies = json.loads(custom_cookies_str)
+                except json.JSONDecodeError:
+                    st.error("Invalid JSON format for Custom Cookies. Please correct it.")
+                    st.stop()
+
+            # Call the updated scrape_website function
+            scrape_website(
+                url=url,
+                method=method,
+                method_params=method_params,
+                request_method=request_method,
+                request_payload=request_payload,
+                custom_headers=custom_headers,
+                custom_cookies=custom_cookies,
+                proxy_url=proxy_url if proxy_url else None,
+                max_retries=max_retries,
+                request_delay=request_delay,
+                request_timeout=request_timeout,
+                export_format=export_format
+            )
 
 # --- AI-Powered Insights (Gemini) ---
 if selected_tool == "🤖 AI-Powered Insights (Gemini)":

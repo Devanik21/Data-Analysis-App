@@ -3722,7 +3722,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         for col in categorical_cols:
             # Convert all unique values to strings before sorting to prevent TypeError
             unique_vals = ['All'] + sorted([str(val) for val in df[col].dropna().unique()])
-            selected_vals = st.sidebar.multiselet(f"Filter by {col}", unique_vals, default='All')
+            selected_vals = st.sidebar.multiselect(f"Filter by {col}", unique_vals, default='All')
             if 'All' not in selected_vals and selected_vals:
                 filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
 

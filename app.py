@@ -3708,6 +3708,7 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         df = st.session_state.df
         
         # --- Sidebar for Filters ---
+        # --- Sidebar for Filters ---
         st.sidebar.header("Dashboard Filters")
         
         # Use a copy of the dataframe for filtering
@@ -3719,8 +3720,9 @@ elif selected_tool == "💼 Power BI Style Dashboard": # This was already there,
         
         # Create filters for categorical columns
         for col in categorical_cols:
-            unique_vals = ['All'] + sorted(df[col].unique().tolist())
-            selected_vals = st.sidebar.multiselect(f"Filter by {col}", unique_vals, default='All')
+            # Convert all unique values to strings before sorting to prevent TypeError
+            unique_vals = ['All'] + sorted([str(val) for val in df[col].dropna().unique()])
+            selected_vals = st.sidebar.multiselet(f"Filter by {col}", unique_vals, default='All')
             if 'All' not in selected_vals and selected_vals:
                 filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
 
